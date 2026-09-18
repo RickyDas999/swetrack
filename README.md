@@ -271,6 +271,10 @@ role. See `src/swetrack/domains/applications/priority.py` and
 - `GET /applications/{id}/priority` — every component, the combined `score`, and the full nested
   `readiness` result (skill gaps, recommended activities) it was derived from. Accepts the same
   `ranker` query parameter as `GET /opportunities/{id}/readiness`.
+- `GET /applications/priority` — every tracked application ranked by `score`, highest first (the
+  "Top Opportunities" list from CLAUDE.md's product end-state). Optional `status` filter, `top_k`
+  (default 10), and the same `ranker` parameter. Registered ahead of
+  `GET /applications/{id}` in `api.py` so `"priority"` is never matched as an `application_id`.
 
 Each component is backed by a real, collected data source, never an invented number:
 

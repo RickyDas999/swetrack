@@ -18,7 +18,11 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from swetrack import __version__
-from swetrack.domains.applications.priority import ApplicationPriority, compute_application_priority
+from swetrack.domains.applications.priority import (
+    ApplicationPriority,
+    compute_application_priority,
+    rank_application_priorities,
+)
 from swetrack.domains.applications.schemas import (
     Application,
     ApplicationStatusEvent,
@@ -175,6 +179,37 @@ def get_applications(
 ) -> list[Application]:
     """List tracked applications, optionally filtered by current status and/or job."""
     return list_applications(session, status=status, job_id=job_id)
+
+
+@app.get("/applications/priority", response_model=list[ApplicationPriority])
+def get_applications_priority(
+    status: ApplicationStatusType | None = Query(default=None),
+    top_k: int = Query(default=10, ge=1),
+    ranker: RankerName = Query(default="tfidf"),
+    session: Session = Depends(get_db_session),
+) -> list[ApplicationPriority]:
+    """Rank tracked applications by priority, highest first -- the "Top Opportunities" list.
+
+    Registered before GET /applications/{application_id} so "priority" is
+    never matched as an application_id path parameter.
+    """
+    applications = list_applications(session, status=status)
+
+    try:
+        jobs = load_jobs()
+    except DataLoadError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    jobs_by_id = {job.job_id: job for job in jobs}
+
+    try:
+        profile = load_candidate_profile()
+    except DataLoadError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    ranked = rank_application_priorities(
+        session, applications=applications, jobs_by_id=jobs_by_id, profile=profile, ranker=_build_ranker(ranker)
+    )
+    return ranked[:top_k]
 
 
 @app.get("/applications/{application_id}", response_model=Application)

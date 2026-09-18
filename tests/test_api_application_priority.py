@@ -1,4 +1,4 @@
-"""Tests for GET /applications/{id}/priority."""
+"""Tests for GET /applications/{id}/priority and GET /applications/priority."""
 
 from __future__ import annotations
 
@@ -62,3 +62,41 @@ def test_application_priority_endpoint_rejects_unknown_ranker(client):
     response = client.get(f"/applications/{created['id']}/priority", params={"ranker": "not-a-real-ranker"})
 
     assert response.status_code == 422
+
+
+def test_applications_priority_endpoint_ranks_tracked_applications(client):
+    other_job_id = load_jobs(DEFAULT_JOBS_PATH)[1].job_id
+    client.post("/applications", json={"job_id": KNOWN_JOB_ID})
+    client.post("/applications", json={"job_id": other_job_id})
+
+    response = client.get("/applications/priority")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 2
+    # Sorted highest score first (not the registration/no-route-conflict-with-{id} check
+    # alone -- a 404 or a single-object body would mean "priority" was swallowed by
+    # GET /applications/{application_id} instead of this route).
+    scores = [item["score"] for item in body]
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_applications_priority_endpoint_respects_top_k(client):
+    other_job_id = load_jobs(DEFAULT_JOBS_PATH)[1].job_id
+    client.post("/applications", json={"job_id": KNOWN_JOB_ID})
+    client.post("/applications", json={"job_id": other_job_id})
+
+    response = client.get("/applications/priority", params={"top_k": 1})
+
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+
+
+def test_applications_priority_endpoint_filters_by_status(client):
+    client.post("/applications", json={"job_id": KNOWN_JOB_ID, "status": "applied"})
+    client.post("/applications", json={"job_id": KNOWN_JOB_ID, "status": "discovered"})
+
+    response = client.get("/applications/priority", params={"status": "applied"})
+
+    assert response.status_code == 200
+    assert all(item["status"] == "applied" for item in response.json())

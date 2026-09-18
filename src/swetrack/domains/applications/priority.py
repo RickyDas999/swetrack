@@ -94,3 +94,33 @@ def compute_application_priority(
         components=components,
         readiness=readiness_result,
     )
+
+
+def rank_application_priorities(
+    session: Session,
+    *,
+    applications: list[Application],
+    jobs_by_id: dict[str, JobRecord],
+    profile: CandidateProfile,
+    ranker: Ranker,
+    weights: ApplicationPriorityWeights = DEFAULT_WEIGHTS,
+    today: date | None = None,
+) -> list[ApplicationPriority]:
+    """Compute priority for a batch of applications, sorted highest score first.
+
+    ``jobs_by_id`` is loaded once by the caller (rather than re-reading the
+    jobs CSV per application) since this can be called over many tracked
+    applications at once -- the "Top Opportunities" list from CLAUDE.md's
+    product end-state. An application whose ``job_id`` is no longer present
+    in ``jobs_by_id`` (the seed data changed since it was created) is
+    silently skipped rather than erroring the whole batch.
+    """
+    results = [
+        compute_application_priority(
+            session, application=application, job=job, profile=profile, ranker=ranker, weights=weights, today=today
+        )
+        for application in applications
+        if (job := jobs_by_id.get(application.job_id)) is not None
+    ]
+    results.sort(key=lambda result: (-result.score, result.application_id))
+    return results

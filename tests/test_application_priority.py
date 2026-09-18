@@ -4,7 +4,7 @@ from datetime import date, datetime, timezone
 
 import pytest
 
-from swetrack.domains.applications.priority import compute_application_priority
+from swetrack.domains.applications.priority import compute_application_priority, rank_application_priorities
 from swetrack.domains.applications.schemas import Application
 from swetrack.domains.learning.services import create_activity, record_attempt
 from swetrack.domains.opportunities.models import CandidateProfile, JobRecord
@@ -139,6 +139,54 @@ def test_compute_application_priority_deadline_urgency_is_zero_with_no_deadline(
     result = _priority(db_session, job=job_no_deadline)
 
     assert result.components.deadline_urgency == pytest.approx(0.0)
+
+
+def test_rank_application_priorities_sorts_by_score_descending(db_session):
+    # A second job with no skill/role/location/company overlap and no
+    # compensation/deadline data -- every component should score lower than
+    # _JOB against the same _PROFILE.
+    weak_job = JobRecord(
+        job_id="JOB-WEAK",
+        company="UnrelatedCo",
+        title="Graphic Designer",
+        location="Antarctica",
+        description="Design marketing graphics.",
+        skills=["Photoshop", "Illustrator"],
+        source="synthetic",
+    )
+    strong_application = _application(status="discovered").model_copy(update={"id": "app-strong"})
+    weak_application = Application(
+        id="app-weak", job_id=weak_job.job_id, status="discovered", created_at=_NOW, updated_at=_NOW
+    )
+
+    ranked = rank_application_priorities(
+        db_session,
+        applications=[weak_application, strong_application],
+        jobs_by_id={_JOB.job_id: _JOB, weak_job.job_id: weak_job},
+        profile=_PROFILE,
+        ranker=TfidfRanker(),
+        today=_TODAY,
+    )
+
+    assert [result.application_id for result in ranked] == ["app-strong", "app-weak"]
+    assert ranked[0].score > ranked[1].score
+
+
+def test_rank_application_priorities_skips_applications_with_missing_job(db_session):
+    orphaned = Application(
+        id="app-orphaned", job_id="JOB-DELETED", status="discovered", created_at=_NOW, updated_at=_NOW
+    )
+
+    ranked = rank_application_priorities(
+        db_session,
+        applications=[orphaned, _application()],
+        jobs_by_id={_JOB.job_id: _JOB},
+        profile=_PROFILE,
+        ranker=TfidfRanker(),
+        today=_TODAY,
+    )
+
+    assert [result.application_id for result in ranked] == ["app-test"]
 
 
 def test_compute_application_priority_rises_with_improved_mastery(db_session):
