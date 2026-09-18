@@ -1,4 +1,5 @@
-# SWETrack API image. Serves GET /health, GET /jobs, and POST /recommend.
+# SWETrack API image. Serves the full API (see README.md) plus a read-only
+# dashboard UI at GET /.
 #
 # The image installs the sentence-transformers/torch libraries (a declared
 # runtime dependency for the embedding ranker) but does NOT pre-download the

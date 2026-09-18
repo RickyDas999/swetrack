@@ -138,6 +138,10 @@ Serve the API:
 uvicorn swetrack.api:app --host 127.0.0.1 --port 8000
 ```
 
+Open **http://127.0.0.1:8000/** in a browser for the dashboard UI (Milestone 15, below), or
+**http://127.0.0.1:8000/docs** for the auto-generated interactive Swagger UI covering every
+endpoint.
+
 In another terminal:
 
 ```bash
@@ -165,6 +169,7 @@ domain's own section further below:
 | Application Priority | `GET /applications/{id}/priority`, `GET /applications/priority` |
 | Interviews | `POST /interviews`, `GET /interviews`, `GET /interviews/{id}` |
 | Skill mastery | `GET /mastery`, `GET /mastery/summary`, `GET /recommendations` |
+| Dashboard | `GET /` (HTML, not JSON — see Milestone 15 below) |
 
 - `GET /health` — service status and version. Never loads the sentence-embedding model.
 - `GET /jobs` — sample job metadata, with optional `?limit=&offset=` pagination.
@@ -495,6 +500,34 @@ Skills" / "Interview Readiness" view, not just a per-job one. See
 Route path names (`/mastery`, `/recommendations`) match CLAUDE.md's own "API Philosophy"
 section, which names both as anticipated top-level resources.
 
+## Dashboard UI (Milestone 15)
+
+A single static, dependency-free HTML page (`src/swetrack/static/dashboard.html`) rendering
+CLAUDE.md's product end-state mockup, served at `GET /` by the same FastAPI app — same-origin
+fetches to the API below it, so no CORS middleware, build step, or frontend framework is
+needed. Read-only except for one write path (tracking a job).
+
+- **Discover Jobs** — `POST /recommend` against the example profile; each result gets a
+  **Track** button that calls `POST /applications`, then refreshes Top Opportunities.
+  Already-tracked jobs (cross-checked against `GET /applications`) show as disabled/"Tracked"
+  rather than letting you track the same job twice.
+- **Top Opportunities** — `GET /applications/priority`, with the `score` and every component
+  (`role_fit`, `readiness`, `user_preference`, `compensation_fit`, `deadline_urgency`) visible
+  per application, never collapsed into one opaque number.
+- **Interview Readiness** — `GET /mastery/summary`'s `coding`/`system_design` rollup.
+- **Weakest Skills** — `GET /mastery?top_k=5`, flagging `has_history: false` skills as "(no
+  practice yet)" rather than presenting a default as if it were an observed estimate.
+- **Today's Preparation** — `GET /recommendations?top_k=3`, with a "Reason" line naming each
+  recommendation's highest-weighted component (e.g. "highest-weighted factor is mastery gap
+  (72%)") — derived directly from the real returned components, not generated prose.
+
+Every panel has its own empty state (e.g. "No tracked applications yet") and error state (e.g.
+"is the API running?") rather than failing silently or showing a blank card. No build tooling,
+no npm, no CDN dependency — plain HTML/CSS/`fetch()` in one file, consistent with CLAUDE.md's
+cost stance and its explicit caution against a "complex frontend redesign." Full read/write UI
+for applications (status transitions) and interviews (logging) is not built here — Swagger UI
+at `/docs` remains the way to exercise those until/unless a UI need for them shows up.
+
 ## Docker
 
 ```bash
@@ -521,9 +554,13 @@ docker run --rm -p 8000:8000 -v swetrack-hf-cache:/root/.cache/huggingface swetr
 ```
 
 > Verified: `docker build` and `docker run` were executed end-to-end (Docker Desktop 28.3.3) —
-> `GET /health`, `GET /jobs`, `POST /applications`, and `GET /applications/priority` all
-> returned correct responses against the running container, including a fresh SQLite DB
-> created inside the container on first write. Re-run this check after any change to
+> `GET /health`, `GET /jobs`, `POST /applications`, `GET /applications/priority`, and `GET /`
+> (the dashboard UI) all returned correct responses against the running container, including a
+> fresh SQLite DB created inside the container on first write. `GET /` specifically confirms
+> the dashboard's file path resolves correctly under a non-editable `pip install` (it's
+> resolved via `find_repo_root()` + `SWETRACK_ROOT_DIR`, not `Path(__file__)` — the same fix
+> `data`/`config` already needed, since `Path(__file__)` would otherwise point into
+> `site-packages` instead of the copied `src/` tree). Re-run this check after any change to
 > `Dockerfile`, `pyproject.toml`, or `infrastructure/database/`, since none of those are
 > covered by `pytest`.
 

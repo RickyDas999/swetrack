@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SWETrack</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --border: #e2e4e9;
+    --text: #1a1d23;
+    --muted: #6b7280;
+    --accent: #2f6fed;
+    --good: #1a9c6d;
+    --mid: #d38b00;
+    --bad: #d64545;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --card: #1d2026;
+      --border: #2c303a;
+      --text: #e7e9ee;
+      --muted: #9aa1ad;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 24px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); margin: 0 0 24px; font-size: 13px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+    max-width: 1200px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .card h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--muted);
+    margin: 0 0 12px;
+  }
+  .empty { color: var(--muted); font-style: italic; }
+  .error { color: var(--bad); font-size: 13px; }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+  }
+  .row:last-child { border-bottom: none; }
+  .row .name { font-weight: 500; }
+  .row .meta { color: var(--muted); font-size: 12px; }
+  .pct { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 42px; text-align: right; }
+  .bar-track { background: var(--border); border-radius: 4px; height: 6px; width: 100%; overflow: hidden; margin-top: 4px; }
+  .bar-fill { height: 100%; border-radius: 4px; }
+  button {
+    font: inherit;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+  button:disabled { background: var(--muted); cursor: default; }
+  button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  select {
+    font: inherit;
+    padding: 4px 6px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+  }
+  .job-title { font-weight: 500; }
+  .job-sub { color: var(--muted); font-size: 12px; }
+  .reason { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .refresh { float: right; }
+  .status-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--border);
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<h1>SWETrack</h1>
+<p class="subtitle">Opportunity Intelligence · Interview Tracking · Skill Intelligence · Adaptive Preparation — local, $0, one example candidate profile.</p>
+
+<div class="grid">
+
+  <div class="card" style="grid-column: 1 / -1;">
+    <h2>Discover Jobs <button class="secondary refresh" onclick="loadDiscover()">Refresh</button></h2>
+    <div id="discover" class="empty">Loading…</div>
+  </div>
+
+  <div class="card" style="grid-column: 1 / -1;">
+    <h2>Top Opportunities <button class="secondary refresh" onclick="loadPriority()">Refresh</button></h2>
+    <div id="priority" class="empty">Loading…</div>
+  </div>
+
+  <div class="card">
+    <h2>Interview Readiness</h2>
+    <div id="readiness-summary" class="empty">Loading…</div>
+  </div>
+
+  <div class="card">
+    <h2>Weakest Skills</h2>
+    <div id="weakest-skills" class="empty">Loading…</div>
+  </div>
+
+  <div class="card" style="grid-column: 1 / -1;">
+    <h2>Today's Preparation</h2>
+    <div id="recommendations" class="empty">Loading…</div>
+  </div>
+
+</div>
+
+<script>
+const fmtPct = (x) => Math.round(x * 100) + '%';
+
+function barColor(x) {
+  if (x >= 0.7) return 'var(--good)';
+  if (x >= 0.4) return 'var(--mid)';
+  return 'var(--bad)';
+}
+
+function bar(x) {
+  return `<div class="bar-track"><div class="bar-fill" style="width:${Math.round(x * 100)}%; background:${barColor(x)}"></div></div>`;
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
+async function getJSON(path, opts) {
+  const res = await fetch(path, opts);
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { detail = (await res.json()).detail ?? detail; } catch (_) {}
+    throw new Error(`${res.status} ${detail}`);
+  }
+  return res.json();
+}
+
+function renderError(el, err) {
+  el.innerHTML = `<div class="error">Couldn't load this — is the API running? (${esc(err.message)})</div>`;
+}
+
+// --- Discover Jobs: POST /recommend, with a Track button -> POST /applications ---
+async function loadDiscover() {
+  const el = document.getElementById('discover');
+  el.innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    const [rec, tracked] = await Promise.all([
+      getJSON('/recommend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ use_example_profile: true, ranker: 'tfidf', top_k: 5 }),
+      }),
+      getJSON('/applications'),
+    ]);
+    const trackedJobIds = new Set(tracked.map((a) => a.job_id));
+    if (!rec.results.length) {
+      el.innerHTML = '<div class="empty">No jobs in the sample dataset.</div>';
+      return;
+    }
+    el.innerHTML = rec.results
+      .map((r) => {
+        const already = trackedJobIds.has(r.job.job_id);
+        return `<div class="row">
+          <div>
+            <div class="job-title">${esc(r.job.title)} — ${esc(r.job.company)}</div>
+            <div class="job-sub">${esc(r.job.location || 'Location n/a')} · fit ${fmtPct(r.score)}</div>
+          </div>
+          <button ${already ? 'disabled' : ''} onclick="trackJob('${r.job.job_id}', this)">
+            ${already ? 'Tracked' : 'Track'}
+          </button>
+        </div>`;
+      })
+      .join('');
+  } catch (err) {
+    renderError(el, err);
+  }
+}
+
+async function trackJob(jobId, btn) {
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    await getJSON('/applications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_id: jobId }),
+    });
+    btn.textContent = 'Tracked';
+    loadPriority();
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'Track';
+    alert('Could not track this job: ' + err.message);
+  }
+}
+
+// --- Top Opportunities: GET /applications/priority, joined with GET /jobs for display names ---
+async function loadPriority() {
+  const el = document.getElementById('priority');
+  el.innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    const [items, jobs] = await Promise.all([getJSON('/applications/priority?top_k=10'), getJSON('/jobs')]);
+    if (!items.length) {
+      el.innerHTML = '<div class="empty">No tracked applications yet — track a job above to see it ranked here.</div>';
+      return;
+    }
+    const jobsById = Object.fromEntries(jobs.map((j) => [j.job_id, j]));
+    el.innerHTML = items
+      .map((it) => {
+        const job = jobsById[it.job_id];
+        const label = job ? `${job.title} — ${job.company}` : it.job_id;
+        return `<div class="row" style="flex-direction: column; align-items: stretch;">
+          <div class="row" style="border: none; padding: 0;">
+            <div class="job-title">${esc(label)} <span class="status-badge">${esc(it.status)}</span></div>
+            <div class="pct">${fmtPct(it.score)}</div>
+          </div>
+          <div class="job-sub">
+            Fit ${fmtPct(it.components.role_fit)} · Readiness ${fmtPct(it.components.readiness)} ·
+            Preference ${fmtPct(it.components.user_preference)} · Comp fit ${fmtPct(it.components.compensation_fit)} ·
+            Deadline urgency ${fmtPct(it.components.deadline_urgency)}
+          </div>
+          ${bar(it.score)}
+        </div>`;
+      })
+      .join('');
+  } catch (err) {
+    renderError(el, err);
+  }
+}
+
+// --- Interview Readiness: GET /mastery/summary ---
+async function loadReadinessSummary() {
+  const el = document.getElementById('readiness-summary');
+  try {
+    const s = await getJSON('/mastery/summary');
+    el.innerHTML = `
+      <div class="row"><span class="name">Coding</span><span class="pct">${fmtPct(s.coding)}</span></div>
+      ${bar(s.coding)}
+      <div class="row" style="margin-top:10px;"><span class="name">System Design</span><span class="pct">${fmtPct(s.system_design)}</span></div>
+      ${bar(s.system_design)}
+    `;
+  } catch (err) {
+    renderError(el, err);
+  }
+}
+
+// --- Weakest Skills: GET /mastery?top_k=5 ---
+async function loadWeakestSkills() {
+  const el = document.getElementById('weakest-skills');
+  try {
+    const skills = await getJSON('/mastery?top_k=5');
+    el.innerHTML = skills
+      .map(
+        (s) => `<div class="row">
+          <span class="name">${esc(s.name)}${s.has_history ? '' : ' <span class="job-sub">(no practice yet)</span>'}</span>
+          <span class="pct">${fmtPct(s.mastery)}</span>
+        </div>`
+      )
+      .join('');
+  } catch (err) {
+    renderError(el, err);
+  }
+}
+
+// --- Today's Preparation: GET /recommendations?top_k=3 ---
+async function loadRecommendations() {
+  const el = document.getElementById('recommendations');
+  try {
+    const recs = await getJSON('/recommendations?top_k=3');
+    if (!recs.length) {
+      el.innerHTML = '<div class="empty">No practice activities recorded yet — nothing to recommend against.</div>';
+      return;
+    }
+    el.innerHTML = recs
+      .map((r, i) => {
+        const c = r.components;
+        const weakest = Object.entries(c).sort((a, b) => b[1] - a[1])[0];
+        return `<div class="row">
+          <div>
+            <div class="job-title">${i + 1}. ${esc(r.activity.title)}</div>
+            <div class="reason">Reason: highest-weighted factor is ${weakest[0].replace('_', ' ')} (${fmtPct(weakest[1])})</div>
+          </div>
+          <div class="pct">${fmtPct(r.score)}</div>
+        </div>`;
+      })
+      .join('');
+  } catch (err) {
+    renderError(el, err);
+  }
+}
+
+loadDiscover();
+loadPriority();
+loadReadinessSummary();
+loadWeakestSkills();
+loadRecommendations();
+</script>
+</body>
+</html>

@@ -8,6 +8,10 @@ ranker="embedding" (see swetrack.domains.opportunities.ranking.embeddings).
 The /applications endpoints (CLAUDE.md Phase 12) track a candidate's
 recruiting pipeline per job -- no ML involved, plain CRUD-style persistence
 over the applications domain.
+
+GET / serves a static, read-only dashboard UI (src/swetrack/static/dashboard.html)
+that fetches from the same API below -- same-origin, so no CORS middleware
+is needed.
 """
 
 from __future__ import annotations
@@ -15,6 +19,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from swetrack import __version__
@@ -60,6 +65,7 @@ from swetrack.domains.opportunities.ranking.tfidf import TfidfRanker
 from swetrack.domains.opportunities.readiness import ReadinessResult, compute_readiness
 from swetrack.domains.skills.models import SkillCategory as SkillCategoryType
 from swetrack.infrastructure.database.base import get_engine, get_sessionmaker, init_db
+from swetrack.infrastructure.paths import find_repo_root
 
 app = FastAPI(title="SWETrack API", version=__version__)
 
@@ -85,6 +91,15 @@ def _build_ranker(name: str) -> Ranker:
     if name == "embedding":
         return EmbeddingRanker()
     return TfidfRanker()
+
+
+_STATIC_DIR = find_repo_root() / "src" / "swetrack" / "static"
+
+
+@app.get("/", include_in_schema=False)
+def dashboard() -> FileResponse:
+    """Serve the read-only dashboard UI. Same-origin fetches to the API below -- no CORS needed."""
+    return FileResponse(_STATIC_DIR / "dashboard.html")
 
 
 @app.get("/health", response_model=HealthResponse)

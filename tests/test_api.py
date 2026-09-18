@@ -11,6 +11,13 @@ from swetrack.domains.opportunities.ranking import embeddings
 client = TestClient(app)
 
 
+def test_dashboard_serves_html():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert "SWETrack" in response.text
+
+
 def test_health_returns_ok_and_does_not_load_embedding_model():
     embeddings._model_cache.clear()
     response = client.get("/health")
