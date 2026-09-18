@@ -26,15 +26,18 @@ from swetrack.domains.learning.schemas import (
     Attempt,
     CodingAttemptDetail,
     Difficulty,
+    InterviewReadinessSummary,
     LearningActivity,
     MistakeType,
     SkillEvent,
     SkillEventSourceType,
     SkillMastery,
+    SkillMasterySummary,
     StudyRecommendation,
     SystemDesignAttemptResult,
 )
 from swetrack.domains.skills.normalization import get_skill_by_id
+from swetrack.domains.skills.taxonomy import TAXONOMY
 from swetrack.ml.knowledge_tracing.bkt import DEFAULT_PARAMETERS, BKTParameters, update_mastery
 from swetrack.ml.study_ranking.ranker import (
     DEFAULT_WEIGHTS,
@@ -353,6 +356,74 @@ def get_mastery(session: Session, skill_id: str) -> SkillMastery | None:
     """Return the cached BKT mastery estimate for a skill, or None if it has no history yet."""
     record = session.get(SkillMasteryRecord, skill_id)
     return _to_mastery(record) if record is not None else None
+
+
+def list_mastery(session: Session, *, bkt_params: BKTParameters = DEFAULT_PARAMETERS) -> list[SkillMasterySummary]:
+    """Mastery for every canonical taxonomy skill, weakest first.
+
+    Every skill in ``TAXONOMY`` is included, not just ones with recorded
+    history -- an unpracticed skill defaults to ``bkt_params.p_init`` (the
+    same "no history yet" default ``compute_readiness`` and
+    ``get_study_recommendations`` already use), with ``has_history=False``
+    marking it as a default rather than an observed estimate. Sorted
+    ascending by mastery so the weakest skills come first.
+    """
+    summaries = []
+    for skill in TAXONOMY:
+        record = session.get(SkillMasteryRecord, skill.id)
+        if record is not None:
+            summaries.append(
+                SkillMasterySummary(
+                    skill_id=skill.id,
+                    name=skill.name,
+                    category=skill.category,
+                    mastery=record.mastery,
+                    event_count=record.event_count,
+                    has_history=True,
+                )
+            )
+        else:
+            summaries.append(
+                SkillMasterySummary(
+                    skill_id=skill.id,
+                    name=skill.name,
+                    category=skill.category,
+                    mastery=bkt_params.p_init,
+                    event_count=0,
+                    has_history=False,
+                )
+            )
+    summaries.sort(key=lambda summary: (summary.mastery, summary.skill_id))
+    return summaries
+
+
+# ponytail: a coarse editorial split of the 8 taxonomy categories into the two
+# interview-prep buckets the product's dashboard mockup shows (coding vs. system
+# design), not a derived or learned grouping. Revisit with activity_type-based
+# aggregation (which attempts were "coding" vs "system_design") if this split
+# proves too coarse for a real dashboard.
+_CODING_CATEGORIES = {"programming_languages", "algorithms", "data_structures"}
+_SYSTEM_DESIGN_CATEGORIES = {"backend", "data_systems", "distributed_systems", "reliability", "system_design"}
+
+
+def get_interview_readiness_summary(
+    session: Session, *, bkt_params: BKTParameters = DEFAULT_PARAMETERS
+) -> InterviewReadinessSummary:
+    """Mastery averaged per skill category, plus a coarse coding/system-design rollup."""
+    by_category: dict[str, list[float]] = {}
+    for summary in list_mastery(session, bkt_params=bkt_params):
+        by_category.setdefault(summary.category, []).append(summary.mastery)
+    category_means = {category: sum(values) / len(values) for category, values in by_category.items()}
+
+    def _bucket_mean(categories: set[str]) -> float:
+        values = [category_means[category] for category in categories if category in category_means]
+        return sum(values) / len(values) if values else 0.0
+
+    return InterviewReadinessSummary(
+        coding=_bucket_mean(_CODING_CATEGORIES),
+        system_design=_bucket_mean(_SYSTEM_DESIGN_CATEGORIES),
+        by_category=category_means,
+    )
 
 
 def get_study_recommendations(

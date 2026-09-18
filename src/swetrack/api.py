@@ -40,6 +40,12 @@ from swetrack.domains.applications.services import (
 from swetrack.domains.interviews.schemas import CreateInterviewRequest, Interview
 from swetrack.domains.interviews.schemas import RoundType as RoundTypeType
 from swetrack.domains.interviews.services import create_interview, get_interview, list_interviews
+from swetrack.domains.learning.schemas import InterviewReadinessSummary, SkillMasterySummary, StudyRecommendation
+from swetrack.domains.learning.services import (
+    get_interview_readiness_summary,
+    get_study_recommendations,
+    list_mastery,
+)
 from swetrack.domains.opportunities.config import DataLoadError, load_candidate_profile, load_jobs
 from swetrack.domains.opportunities.models import (
     HealthResponse,
@@ -52,6 +58,7 @@ from swetrack.domains.opportunities.ranking.base import Ranker
 from swetrack.domains.opportunities.ranking.embeddings import EmbeddingRanker
 from swetrack.domains.opportunities.ranking.tfidf import TfidfRanker
 from swetrack.domains.opportunities.readiness import ReadinessResult, compute_readiness
+from swetrack.domains.skills.models import SkillCategory as SkillCategoryType
 from swetrack.infrastructure.database.base import get_engine, get_sessionmaker, init_db
 
 app = FastAPI(title="SWETrack API", version=__version__)
@@ -316,3 +323,41 @@ def get_interview_by_id(interview_id: str, session: Session = Depends(get_db_ses
     if interview is None:
         raise HTTPException(status_code=404, detail=f"Unknown interview_id: {interview_id!r}")
     return interview
+
+
+@app.get("/mastery", response_model=list[SkillMasterySummary])
+def get_mastery_list(
+    top_k: int | None = Query(default=None, ge=1),
+    category: SkillCategoryType | None = Query(default=None),
+    session: Session = Depends(get_db_session),
+) -> list[SkillMasterySummary]:
+    """Mastery for every canonical skill, weakest first. Optional `category` filter and `top_k` cap.
+
+    Every taxonomy skill is included, not just practiced ones -- see
+    `learning.services.list_mastery` for why (an unpracticed skill can still
+    be the weakest).
+    """
+    summaries = list_mastery(session)
+    if category is not None:
+        summaries = [summary for summary in summaries if summary.category == category]
+    return summaries[:top_k] if top_k is not None else summaries
+
+
+@app.get("/mastery/summary", response_model=InterviewReadinessSummary)
+def get_mastery_summary(session: Session = Depends(get_db_session)) -> InterviewReadinessSummary:
+    """Mastery averaged per skill category, plus a coarse coding/system-design rollup."""
+    return get_interview_readiness_summary(session)
+
+
+@app.get("/recommendations", response_model=list[StudyRecommendation])
+def get_recommendations(
+    top_k: int = Query(default=5, ge=1),
+    session: Session = Depends(get_db_session),
+) -> list[StudyRecommendation]:
+    """Adaptive study recommendations across every tracked skill, unfiltered by any one job.
+
+    The same heuristic ranker `GET /opportunities/{id}/readiness` uses
+    (filtered to one job's required skills there); here it ranks over every
+    skill any tracked activity touches.
+    """
+    return get_study_recommendations(session, top_k=top_k)

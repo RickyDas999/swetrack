@@ -146,3 +146,34 @@ class SkillMastery(BaseModel):
     mastery: float = Field(ge=0.0, le=1.0)
     event_count: int = Field(ge=0)
     updated_at: datetime
+
+
+class SkillMasterySummary(BaseModel):
+    """One taxonomy skill's mastery for the full-catalog overview (``GET /mastery``).
+
+    Unlike ``SkillMastery`` (only returned for a skill with recorded history),
+    every canonical skill appears here -- an unpracticed one defaults to
+    ``BKTParameters.p_init`` with ``has_history=False``, so a never-touched
+    skill can still surface as "weakest" rather than silently vanishing from
+    the list. ``has_history`` is what keeps that default honest: callers can
+    tell a real observed estimate from a starting assumption.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    skill_id: str
+    name: str
+    category: str
+    mastery: float = Field(ge=0.0, le=1.0)
+    event_count: int = Field(ge=0)
+    has_history: bool
+
+
+class InterviewReadinessSummary(BaseModel):
+    """Mastery averaged per skill category, plus a coarse coding/system-design rollup."""
+
+    model_config = ConfigDict(frozen=True)
+
+    coding: float = Field(ge=0.0, le=1.0)
+    system_design: float = Field(ge=0.0, le=1.0)
+    by_category: dict[str, float]

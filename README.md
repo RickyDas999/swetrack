@@ -164,6 +164,7 @@ domain's own section further below:
 | Applications | `POST /applications`, `GET /applications`, `GET /applications/{id}`, `POST /applications/{id}/status`, `GET /applications/{id}/history` |
 | Application Priority | `GET /applications/{id}/priority`, `GET /applications/priority` |
 | Interviews | `POST /interviews`, `GET /interviews`, `GET /interviews/{id}` |
+| Skill mastery | `GET /mastery`, `GET /mastery/summary`, `GET /recommendations` |
 
 - `GET /health` — service status and version. Never loads the sentence-embedding model.
 - `GET /jobs` — sample job metadata, with optional `?limit=&offset=` pagination.
@@ -359,9 +360,9 @@ recommender (CLAUDE.md Phase 10). See `ml/study_ranking/ranker.py` and
   filter restricts ranking to activities touching at least one given skill — used by Role
   Readiness (below) to surface only recommendations relevant to one job's required skills.
 
-No API endpoint yet — exposed indirectly through `GET /opportunities/{id}/readiness`'s
-`recommended_activities`; service-layer + tests (`tests/test_study_recommendations.py`,
-`tests/test_study_ranking.py`) otherwise.
+- `GET /recommendations?top_k=` — this ranker over every skill any tracked activity touches, not
+  filtered to one job (see Milestone 14 below for the endpoint). `GET /opportunities/{id}/readiness`
+  also surfaces it, filtered to one job's required skills.
 
 ## Role Readiness (Milestone 10)
 
@@ -464,6 +465,36 @@ component, not observed real postings. Deadlines are static demo dates and will 
 read as "passed" (`deadline_urgency` → 0) as real time moves past them; regenerate them
 periodically rather than treating them as live data.
 
+## Skill mastery overview (Milestone 14)
+
+Three endpoints exposing the learning domain's mastery data directly, rather than only
+indirectly through Role Readiness — built to unblock a dashboard UI needing a global "Weakest
+Skills" / "Interview Readiness" view, not just a per-job one. See
+`learning.services.list_mastery` / `get_interview_readiness_summary` and
+`src/swetrack/domains/learning/schemas.py`.
+
+- `GET /mastery?top_k=&category=` — every canonical taxonomy skill's mastery, weakest first.
+  Optional `category` filter (one of the 8 taxonomy categories) and `top_k` cap. Every skill is
+  included, not just practiced ones — an unpracticed skill defaults to BKT's `p_init` (0.3) with
+  `has_history: false`, so a skill nobody has touched yet can still surface as the weakest,
+  rather than silently vanishing from the list. `has_history` is what keeps that default honest:
+  callers can tell a real observed estimate from a starting assumption.
+- `GET /mastery/summary` — mastery averaged per skill category (`by_category`), plus a coarse
+  `coding` / `system_design` rollup (the "Interview Readiness: Coding 78% / System Design 63%"
+  panel from CLAUDE.md's product mockup). The two-bucket split (`programming_languages` +
+  `algorithms` + `data_structures` → `coding`; `backend` + `data_systems` +
+  `distributed_systems` + `reliability` + `system_design` → `system_design`) is a deliberate
+  editorial grouping of the 8 real taxonomy categories, not a derived or learned one — flagged
+  in code as a coarse simplification to revisit (e.g. aggregating by which activity's
+  `activity_type` produced each SkillEvent, instead of by static skill category) if it proves
+  too coarse once there's real multi-skill practice history to test it against.
+- `GET /recommendations?top_k=` — `get_study_recommendations` with no job filter, already
+  documented under Milestone 9 above; this is just its own endpoint instead of only being
+  reachable through `GET /opportunities/{id}/readiness`.
+
+Route path names (`/mastery`, `/recommendations`) match CLAUDE.md's own "API Philosophy"
+section, which names both as anticipated top-level resources.
+
 ## Docker
 
 ```bash
@@ -489,11 +520,12 @@ removed. To persist/reuse that cache across runs, mount a volume:
 docker run --rm -p 8000:8000 -v swetrack-hf-cache:/root/.cache/huggingface swetrack:milestone-1
 ```
 
-> Docker build/run were not executed in this development environment (Docker Desktop was
-> not installed at the time of this milestone) — see the completion report for the exact
-> blocked commands. The Dockerfile/`.dockerignore` follow the same install and run path
-> used to verify the API locally above, and should be re-verified with `docker build` /
-> `docker run` before relying on this section as confirmed.
+> Verified: `docker build` and `docker run` were executed end-to-end (Docker Desktop 28.3.3) —
+> `GET /health`, `GET /jobs`, `POST /applications`, and `GET /applications/priority` all
+> returned correct responses against the running container, including a fresh SQLite DB
+> created inside the container on first write. Re-run this check after any change to
+> `Dockerfile`, `pyproject.toml`, or `infrastructure/database/`, since none of those are
+> covered by `pytest`.
 
 ## Cost stance
 
