@@ -262,22 +262,34 @@ milestone — logging an interview once its outcome is known is the supported pa
 
 ## Application Priority (Milestone 13)
 
-Combines Role Fit, Readiness, and preference match into one explainable, component-visible score
-per tracked application (CLAUDE.md Phase 14). See `src/swetrack/domains/applications/priority.py`
-and `src/swetrack/ml/application_priority/`.
+Combines Role Fit, Readiness, preference match, company interest, compensation fit, and deadline
+urgency into one explainable, component-visible score per tracked application (CLAUDE.md Phase
+14) — all six components from CLAUDE.md's list, location folded into `user_preference` alongside
+role. See `src/swetrack/domains/applications/priority.py` and
+`src/swetrack/ml/application_priority/`.
 
-- `GET /applications/{id}/priority` — Fit, Readiness, and preference-match components, the
-  combined `score`, and the full nested `readiness` result (skill gaps, recommended activities)
-  it was derived from. Accepts the same `ranker` query parameter as
-  `GET /opportunities/{id}/readiness`.
+- `GET /applications/{id}/priority` — every component, the combined `score`, and the full nested
+  `readiness` result (skill gaps, recommended activities) it was derived from. Accepts the same
+  `ranker` query parameter as `GET /opportunities/{id}/readiness`.
 
-CLAUDE.md's full component list for Application Priority is role fit, readiness, user preference,
-deadline urgency, company interest, location, and compensation. Only `role_fit`, `readiness`, and
-`user_preference` (role/location preference overlap) are implemented — those are the only ones
-with a real, already-collected data source today. `JobRecord` has no deadline or compensation
-field and there is no captured "company interest" rating anywhere in the schema; inventing scores
-for them would be the same "fabricated precision" the readiness milestone already declined to add
-for per-skill importance. Add them as new weighted components once that data actually exists.
+Each component is backed by a real, collected data source, never an invented number:
+
+- `role_fit`, `readiness` — from the existing `compute_readiness` (Milestone 10), unchanged.
+- `user_preference` — role/location overlap between `CandidateProfile` and the job, reusing
+  `build_match_reasons`.
+- `company_interest` — the same match/neutral/no-match logic as `user_preference`, against a new
+  `CandidateProfile.preferred_companies` list.
+- `compensation_fit` — whether `JobRecord.compensation_max` clears a new
+  `CandidateProfile.minimum_compensation`; neutral (`0.5`) if either side has no data to compare.
+- `deadline_urgency` — an exponential decay toward 1.0 as `JobRecord.application_deadline`
+  approaches, `0.0` once it has passed or is unknown.
+
+`data/sample_jobs.csv` now carries `compensation_min`, `compensation_max`, and
+`application_deadline` for all 26 seed jobs, and `config/candidate_profile.example.yaml` carries
+`preferred_companies` and `minimum_compensation` — synthetic values chosen to exercise every
+component, not observed real postings. Deadlines are static demo dates and will eventually all
+read as "passed" (`deadline_urgency` → 0) as real time moves past them; regenerate them
+periodically rather than treating them as live data.
 
 ## Docker
 

@@ -6,6 +6,7 @@ shared by both rankers, the CLI scripts, and the FastAPI service.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -34,9 +35,11 @@ class CandidateProfile(BaseModel):
     experience: str = Field(..., min_length=1)
     preferred_roles: list[str] = Field(default_factory=list)
     preferred_locations: list[str] = Field(default_factory=list)
+    preferred_companies: list[str] = Field(default_factory=list)
+    minimum_compensation: int | None = Field(default=None, ge=0)
     keywords: list[str] = Field(default_factory=list)
 
-    @field_validator("skills", "preferred_roles", "preferred_locations", "keywords", mode="before")
+    @field_validator("skills", "preferred_roles", "preferred_locations", "preferred_companies", "keywords", mode="before")
     @classmethod
     def _normalize_lists(cls, value: object) -> list[str]:
         return _clean_str_list(value)
@@ -69,6 +72,9 @@ class JobRecord(BaseModel):
     experience_level: str = ""
     url: str = ""
     source: JobSource = "synthetic"
+    compensation_min: int | None = Field(default=None, ge=0)
+    compensation_max: int | None = Field(default=None, ge=0)
+    application_deadline: date | None = None
 
     @field_validator("skills", mode="before")
     @classmethod
@@ -90,6 +96,21 @@ class JobRecord(BaseModel):
             return ""
         return str(value).strip()
 
+    @field_validator("compensation_min", "compensation_max", "application_deadline", mode="before")
+    @classmethod
+    def _blank_to_none(cls, value: object) -> object:
+        """CSV rows hand in "" (not a missing key) for an unfilled cell."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @model_validator(mode="after")
+    def _compensation_range_is_ordered(self) -> "JobRecord":
+        if self.compensation_min is not None and self.compensation_max is not None:
+            if self.compensation_min > self.compensation_max:
+                raise ValueError("compensation_min must not exceed compensation_max")
+        return self
+
 
 class MatchReasons(BaseModel):
     """Structured, human-readable explanation for one recommendation."""
@@ -97,6 +118,7 @@ class MatchReasons(BaseModel):
     matched_skills: list[str] = Field(default_factory=list)
     matched_roles: list[str] = Field(default_factory=list)
     matched_locations: list[str] = Field(default_factory=list)
+    matched_companies: list[str] = Field(default_factory=list)
 
     def as_text(self) -> list[str]:
         """Render structured overlap fields as short human-readable strings."""
@@ -107,8 +129,10 @@ class MatchReasons(BaseModel):
             lines.append(f"Preferred role match: {', '.join(self.matched_roles)}")
         if self.matched_locations:
             lines.append(f"Preferred location match: {', '.join(self.matched_locations)}")
+        if self.matched_companies:
+            lines.append(f"Preferred company match: {', '.join(self.matched_companies)}")
         if not lines:
-            lines.append("No structured skill, role, or location overlap detected.")
+            lines.append("No structured skill, role, location, or company overlap detected.")
         return lines
 
 

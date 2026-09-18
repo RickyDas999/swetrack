@@ -40,7 +40,14 @@ def test_application_priority_endpoint_returns_score_and_components(client):
     assert body["application_id"] == created["id"]
     assert body["job_id"] == KNOWN_JOB_ID
     assert 0.0 <= body["score"] <= 1.0
-    assert set(body["components"].keys()) == {"role_fit", "readiness", "user_preference"}
+    assert set(body["components"].keys()) == {
+        "role_fit",
+        "readiness",
+        "user_preference",
+        "company_interest",
+        "compensation_fit",
+        "deadline_urgency",
+    }
     assert "readiness_score" in body["readiness"]
 
 

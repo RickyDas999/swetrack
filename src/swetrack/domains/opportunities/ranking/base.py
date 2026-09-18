@@ -58,6 +58,14 @@ def _matched_locations(profile: CandidateProfile, job: JobRecord) -> list[str]:
     return matched
 
 
+def _matched_companies(profile: CandidateProfile, job: JobRecord) -> list[str]:
+    matched: list[str] = []
+    for company in profile.preferred_companies:
+        if _contains_ci(company, job.company) or _contains_ci(job.company, company):
+            matched.append(company)
+    return matched
+
+
 def build_match_reasons(profile: CandidateProfile, job: JobRecord) -> MatchReasons:
     """Transparent structured overlap between a profile and a job.
 
@@ -68,6 +76,7 @@ def build_match_reasons(profile: CandidateProfile, job: JobRecord) -> MatchReaso
         matched_skills=_matched_skills(profile, job),
         matched_roles=_matched_roles(profile, job),
         matched_locations=_matched_locations(profile, job),
+        matched_companies=_matched_companies(profile, job),
     )
 
 

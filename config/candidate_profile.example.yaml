@@ -32,6 +32,12 @@ preferred_locations:
   - Remote
   - New York, NY
 
+preferred_companies:
+  - TechNova Inc
+  - CloudForge Labs
+
+minimum_compensation: 95000
+
 keywords:
   - distributed systems
   - cloud infrastructure
