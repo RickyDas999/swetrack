@@ -260,6 +260,25 @@ history: CLAUDE.md Phase 13 is explicit that mastery should not be inferred befo
 is known, and there is no endpoint to revise a `"pending"` result after the fact in this
 milestone — logging an interview once its outcome is known is the supported path.
 
+## Application Priority (Milestone 13)
+
+Combines Role Fit, Readiness, and preference match into one explainable, component-visible score
+per tracked application (CLAUDE.md Phase 14). See `src/swetrack/domains/applications/priority.py`
+and `src/swetrack/ml/application_priority/`.
+
+- `GET /applications/{id}/priority` — Fit, Readiness, and preference-match components, the
+  combined `score`, and the full nested `readiness` result (skill gaps, recommended activities)
+  it was derived from. Accepts the same `ranker` query parameter as
+  `GET /opportunities/{id}/readiness`.
+
+CLAUDE.md's full component list for Application Priority is role fit, readiness, user preference,
+deadline urgency, company interest, location, and compensation. Only `role_fit`, `readiness`, and
+`user_preference` (role/location preference overlap) are implemented — those are the only ones
+with a real, already-collected data source today. `JobRecord` has no deadline or compensation
+field and there is no captured "company interest" rating anywhere in the schema; inventing scores
+for them would be the same "fabricated precision" the readiness milestone already declined to add
+for per-skill importance. Add them as new weighted components once that data actually exists.
+
 ## Docker
 
 ```bash

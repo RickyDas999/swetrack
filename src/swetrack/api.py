@@ -18,6 +18,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from swetrack import __version__
+from swetrack.domains.applications.priority import ApplicationPriority, compute_application_priority
 from swetrack.domains.applications.schemas import (
     Application,
     ApplicationStatusEvent,
@@ -206,6 +207,41 @@ def get_application_status_history(
     if get_application(session, application_id) is None:
         raise HTTPException(status_code=404, detail=f"Unknown application_id: {application_id!r}")
     return get_application_history(session, application_id)
+
+
+@app.get("/applications/{application_id}/priority", response_model=ApplicationPriority)
+def get_application_priority(
+    application_id: str,
+    ranker: RankerName = Query(default="tfidf"),
+    session: Session = Depends(get_db_session),
+) -> ApplicationPriority:
+    """Role Fit, Readiness, and preference match for one tracked application, combined into one score.
+
+    Uses the example candidate profile, same as GET /opportunities/{id}/readiness
+    (no per-request profile: a GET request has no body, and this is a
+    single-user local app with no auth/user concept).
+    """
+    application = get_application(session, application_id)
+    if application is None:
+        raise HTTPException(status_code=404, detail=f"Unknown application_id: {application_id!r}")
+
+    try:
+        jobs = load_jobs()
+    except DataLoadError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    job = next((candidate for candidate in jobs if candidate.job_id == application.job_id), None)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Unknown job_id: {application.job_id!r}")
+
+    try:
+        profile = load_candidate_profile()
+    except DataLoadError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return compute_application_priority(
+        session, application=application, job=job, profile=profile, ranker=_build_ranker(ranker)
+    )
 
 
 @app.post("/interviews", response_model=Interview, status_code=201)
