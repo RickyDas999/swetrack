@@ -1,9 +1,13 @@
-"""FastAPI service: GET /health, GET /jobs, POST /recommend, and GET /opportunities/{id}/readiness.
+"""FastAPI service: opportunity ranking/readiness endpoints plus the application pipeline.
 
 The sentence-embedding model is never touched by /health or /jobs. It is
 only loaded, lazily and cached once per process, the first time a
 POST /recommend or GET /opportunities/{id}/readiness request selects
 ranker="embedding" (see swetrack.domains.opportunities.ranking.embeddings).
+
+The /applications endpoints (CLAUDE.md Phase 12) track a candidate's
+recruiting pipeline per job -- no ML involved, plain CRUD-style persistence
+over the applications domain.
 """
 
 from __future__ import annotations
@@ -14,6 +18,20 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from swetrack import __version__
+from swetrack.domains.applications.schemas import (
+    Application,
+    ApplicationStatusEvent,
+    CreateApplicationRequest,
+    TransitionStatusRequest,
+)
+from swetrack.domains.applications.schemas import ApplicationStatus as ApplicationStatusType
+from swetrack.domains.applications.services import (
+    create_application,
+    get_application,
+    get_application_history,
+    list_applications,
+    transition_status,
+)
 from swetrack.domains.opportunities.config import DataLoadError, load_candidate_profile, load_jobs
 from swetrack.domains.opportunities.models import (
     HealthResponse,
@@ -129,3 +147,59 @@ def get_readiness(
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     return compute_readiness(session, job=job, profile=profile, ranker=_build_ranker(ranker))
+
+
+@app.post("/applications", response_model=Application, status_code=201)
+def post_application(
+    request: CreateApplicationRequest, session: Session = Depends(get_db_session)
+) -> Application:
+    """Start tracking an application to a job, at an optional initial status (default 'discovered')."""
+    try:
+        application, _ = create_application(
+            session, job_id=request.job_id, status=request.status, notes=request.notes
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return application
+
+
+@app.get("/applications", response_model=list[Application])
+def get_applications(
+    status: ApplicationStatusType | None = Query(default=None),
+    job_id: str | None = Query(default=None),
+    session: Session = Depends(get_db_session),
+) -> list[Application]:
+    """List tracked applications, optionally filtered by current status and/or job."""
+    return list_applications(session, status=status, job_id=job_id)
+
+
+@app.get("/applications/{application_id}", response_model=Application)
+def get_application_by_id(application_id: str, session: Session = Depends(get_db_session)) -> Application:
+    application = get_application(session, application_id)
+    if application is None:
+        raise HTTPException(status_code=404, detail=f"Unknown application_id: {application_id!r}")
+    return application
+
+
+@app.post("/applications/{application_id}/status", response_model=Application)
+def post_application_status(
+    application_id: str, request: TransitionStatusRequest, session: Session = Depends(get_db_session)
+) -> Application:
+    """Move an application to a new status, recording one immutable history event."""
+    try:
+        application, _ = transition_status(
+            session, application_id=application_id, to_status=request.status, notes=request.notes
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return application
+
+
+@app.get("/applications/{application_id}/history", response_model=list[ApplicationStatusEvent])
+def get_application_status_history(
+    application_id: str, session: Session = Depends(get_db_session)
+) -> list[ApplicationStatusEvent]:
+    """An application's full immutable status transition history, in chronological order."""
+    if get_application(session, application_id) is None:
+        raise HTTPException(status_code=404, detail=f"Unknown application_id: {application_id!r}")
+    return get_application_history(session, application_id)

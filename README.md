@@ -213,6 +213,30 @@ learner with hand-picked "true" parameters different from BKT's defaults — it 
 the evaluation harness works, not that BKT will outperform the baseline on real interview
 practice data.
 
+## Application pipeline (Milestone 11)
+
+Tracks a candidate's recruiting pipeline per job — no ML, plain persisted state with an
+immutable status history. See `src/swetrack/domains/applications/`.
+
+- `POST /applications` — start tracking a `job_id` (must match a known job), at an optional
+  initial `status` (default `"discovered"`).
+- `GET /applications` — list tracked applications, optionally filtered by `status` and/or
+  `job_id`.
+- `GET /applications/{id}` — one application's current status.
+- `POST /applications/{id}/status` — append a new status transition. There is no enforced
+  transition graph: any `status` is reachable from any other, since real recruiting pipelines
+  are not strictly linear (e.g. a rejected application can later become `interested` again for
+  a different role).
+- `GET /applications/{id}/history` — the full, chronological, immutable transition history.
+
+Valid `status` values: `discovered`, `interested`, `applied`, `oa`, `recruiter_screen`,
+`technical`, `system_design`, `behavioral`, `final`, `offer`, `rejected`, `withdrawn`.
+
+This milestone intentionally adds no ranking, scoring, or prediction — CLAUDE.md's Phase 12
+guidance is explicit that application-outcome ML should wait until enough real pipeline data
+exists. `Application Priority` (combining Role Fit, Readiness, and pipeline signals) is future
+work, not implemented here.
+
 ## Docker
 
 ```bash
