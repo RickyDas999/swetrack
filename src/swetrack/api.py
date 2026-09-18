@@ -32,6 +32,9 @@ from swetrack.domains.applications.services import (
     list_applications,
     transition_status,
 )
+from swetrack.domains.interviews.schemas import CreateInterviewRequest, Interview
+from swetrack.domains.interviews.schemas import RoundType as RoundTypeType
+from swetrack.domains.interviews.services import create_interview, get_interview, list_interviews
 from swetrack.domains.opportunities.config import DataLoadError, load_candidate_profile, load_jobs
 from swetrack.domains.opportunities.models import (
     HealthResponse,
@@ -203,3 +206,42 @@ def get_application_status_history(
     if get_application(session, application_id) is None:
         raise HTTPException(status_code=404, detail=f"Unknown application_id: {application_id!r}")
     return get_application_history(session, application_id)
+
+
+@app.post("/interviews", response_model=Interview, status_code=201)
+def post_interview(request: CreateInterviewRequest, session: Session = Depends(get_db_session)) -> Interview:
+    """Log one interview round. Emits SkillEvents/mastery updates only if `result` is decided."""
+    try:
+        interview, _ = create_interview(
+            session,
+            company=request.company,
+            role=request.role,
+            round_type=request.round_type,
+            date=request.date,
+            skills_tested=request.skills_tested,
+            result=request.result,
+            notes=request.notes,
+            feedback=request.feedback,
+            application_id=request.application_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return interview
+
+
+@app.get("/interviews", response_model=list[Interview])
+def get_interviews(
+    application_id: str | None = Query(default=None),
+    round_type: RoundTypeType | None = Query(default=None),
+    session: Session = Depends(get_db_session),
+) -> list[Interview]:
+    """List logged interviews, optionally filtered by application and/or round type."""
+    return list_interviews(session, application_id=application_id, round_type=round_type)
+
+
+@app.get("/interviews/{interview_id}", response_model=Interview)
+def get_interview_by_id(interview_id: str, session: Session = Depends(get_db_session)) -> Interview:
+    interview = get_interview(session, interview_id)
+    if interview is None:
+        raise HTTPException(status_code=404, detail=f"Unknown interview_id: {interview_id!r}")
+    return interview

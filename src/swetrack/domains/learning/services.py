@@ -119,7 +119,7 @@ def _write_attempt_and_mastery(
     session.flush()  # surface any SkillEvent constraint violation before touching mastery
 
     for skill_id in activity.skill_ids:
-        _apply_sequential_mastery_update(session, skill_id, correct=success, params=bkt_params)
+        apply_sequential_mastery_update(session, skill_id, correct=success, params=bkt_params)
 
     return attempt_record, event_records
 
@@ -303,7 +303,7 @@ def record_system_design_attempt(
         session.flush()  # surface any SkillEvent constraint violation before touching mastery
 
         for skill_id, score in scores.items():
-            _apply_sequential_mastery_update(
+            apply_sequential_mastery_update(
                 session, skill_id, correct=score >= _SYSTEM_DESIGN_MASTERY_THRESHOLD, params=bkt_params
             )
 
@@ -437,10 +437,15 @@ def get_study_recommendations(
     return recommendations[:top_k]
 
 
-def _apply_sequential_mastery_update(
+def apply_sequential_mastery_update(
     session: Session, skill_id: str, *, correct: bool, params: BKTParameters
 ) -> SkillMasteryRecord:
-    """Apply one BKT step to the cached mastery for a skill, creating it if absent."""
+    """Apply one BKT step to the cached mastery for a skill, creating it if absent.
+
+    Public so other domains that emit ``SkillEvent``s from a structured,
+    already-known outcome (e.g. ``interviews.services.create_interview``) can
+    reuse the exact same mastery machinery instead of reimplementing it.
+    """
     record = session.get(SkillMasteryRecord, skill_id)
     prior_mastery = record.mastery if record is not None else params.p_init
     new_mastery = update_mastery(prior_mastery, correct, params)

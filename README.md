@@ -237,6 +237,29 @@ guidance is explicit that application-outcome ML should wait until enough real p
 exists. `Application Priority` (combining Role Fit, Readiness, and pipeline signals) is future
 work, not implemented here.
 
+## Interview tracking (Milestone 12)
+
+Logs interview rounds and, when a round's outcome is already known, feeds it into the same
+skill-mastery machinery coding and System Design attempts use. See
+`src/swetrack/domains/interviews/`.
+
+- `POST /interviews` — log one round: `company`, `role`, `round_type`, `date`, `skills_tested`,
+  and an optional `application_id`, `notes`, `feedback`. `result` defaults to `"pending"`.
+- `GET /interviews` — list logged interviews, optionally filtered by `application_id` and/or
+  `round_type`.
+- `GET /interviews/{id}` — one interview.
+
+Valid `round_type` values: `recruiter`, `oa`, `coding`, `system_design`, `behavioral`,
+`hiring_manager`, `final`.
+
+When `result` is `"passed"` or `"failed"`, one immutable `SkillEvent` (source type
+`interview_feedback`, per CLAUDE.md Phase 6) and one sequential BKT mastery update is written per
+skill in `skills_tested`, reusing `learning.services.apply_sequential_mastery_update` — the same
+function coding and System Design attempts call. A `"pending"` result writes nothing to skill
+history: CLAUDE.md Phase 13 is explicit that mastery should not be inferred before a real outcome
+is known, and there is no endpoint to revise a `"pending"` result after the fact in this
+milestone — logging an interview once its outcome is known is the supported path.
+
 ## Docker
 
 ```bash
