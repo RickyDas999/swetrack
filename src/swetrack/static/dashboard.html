@@ -101,6 +101,22 @@
     background: var(--border);
     color: var(--muted);
   }
+  .interview-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .interview-form input, .interview-form select {
+    font: inherit;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+  }
+  .interview-form input[name="company"], .interview-form input[name="role"] { width: 140px; }
+  .interview-form input[name="skills_tested"] { flex: 1 1 220px; }
 </style>
 </head>
 <body>
@@ -133,6 +149,32 @@
   <div class="card" style="grid-column: 1 / -1;">
     <h2>Today's Preparation</h2>
     <div id="recommendations" class="empty">Loading…</div>
+  </div>
+
+  <div class="card" style="grid-column: 1 / -1;">
+    <h2>Log Interview</h2>
+    <form id="interview-form" class="interview-form">
+      <input name="company" placeholder="Company" required>
+      <input name="role" placeholder="Role" required>
+      <select name="round_type" required>
+        <option value="recruiter">Recruiter</option>
+        <option value="oa">OA</option>
+        <option value="coding" selected>Coding</option>
+        <option value="system_design">System Design</option>
+        <option value="behavioral">Behavioral</option>
+        <option value="hiring_manager">Hiring Manager</option>
+        <option value="final">Final</option>
+      </select>
+      <input name="date" type="date" required>
+      <input name="skills_tested" placeholder="skill ids, comma-separated (see Weakest Skills)">
+      <select name="result">
+        <option value="pending" selected>Pending</option>
+        <option value="passed">Passed</option>
+        <option value="failed">Failed</option>
+      </select>
+      <button type="submit">Log</button>
+    </form>
+    <div id="interviews" class="empty" style="margin-top: 12px;">Loading…</div>
   </div>
 
 </div>
@@ -225,6 +267,11 @@ async function trackJob(jobId, btn) {
   }
 }
 
+const APPLICATION_STATUSES = [
+  'discovered', 'interested', 'applied', 'oa', 'recruiter_screen',
+  'technical', 'system_design', 'behavioral', 'final', 'offer', 'rejected', 'withdrawn',
+];
+
 // --- Top Opportunities: GET /applications/priority, joined with GET /jobs for display names ---
 async function loadPriority() {
   const el = document.getElementById('priority');
@@ -240,9 +287,12 @@ async function loadPriority() {
       .map((it) => {
         const job = jobsById[it.job_id];
         const label = job ? `${job.title} — ${job.company}` : it.job_id;
+        const options = APPLICATION_STATUSES.map(
+          (s) => `<option value="${s}" ${s === it.status ? 'selected' : ''}>${s}</option>`
+        ).join('');
         return `<div class="row" style="flex-direction: column; align-items: stretch;">
           <div class="row" style="border: none; padding: 0;">
-            <div class="job-title">${esc(label)} <span class="status-badge">${esc(it.status)}</span></div>
+            <div class="job-title">${esc(label)}</div>
             <div class="pct">${fmtPct(it.score)}</div>
           </div>
           <div class="job-sub">
@@ -251,11 +301,35 @@ async function loadPriority() {
             Deadline urgency ${fmtPct(it.components.deadline_urgency)}
           </div>
           ${bar(it.score)}
+          <div style="margin-top: 8px; display: flex; gap: 8px; align-items: center;">
+            <select onchange="this.dataset.pending = this.value">${options}</select>
+            <button class="secondary" onclick="updateStatus('${it.application_id}', this)">Update status</button>
+          </div>
         </div>`;
       })
       .join('');
   } catch (err) {
     renderError(el, err);
+  }
+}
+
+async function updateStatus(applicationId, btn) {
+  const select = btn.previousElementSibling;
+  const status = select.dataset.pending || select.value;
+  btn.disabled = true;
+  const original = btn.textContent;
+  btn.textContent = '…';
+  try {
+    await getJSON(`/applications/${applicationId}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    loadPriority();
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = original;
+    alert('Could not update status: ' + err.message);
   }
 }
 
@@ -320,11 +394,74 @@ async function loadRecommendations() {
   }
 }
 
+// --- Log Interview: POST /interviews, then GET /interviews ---
+async function loadInterviews() {
+  const el = document.getElementById('interviews');
+  el.innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    const interviews = await getJSON('/interviews');
+    if (!interviews.length) {
+      el.innerHTML = '<div class="empty">No interviews logged yet.</div>';
+      return;
+    }
+    el.innerHTML = interviews
+      .slice()
+      .reverse()
+      .map(
+        (iv) => `<div class="row">
+          <div>
+            <div class="job-title">${esc(iv.company)} — ${esc(iv.role)}</div>
+            <div class="job-sub">${esc(iv.round_type)} · ${esc(iv.date.slice(0, 10))}</div>
+          </div>
+          <span class="status-badge">${esc(iv.result)}</span>
+        </div>`
+      )
+      .join('');
+  } catch (err) {
+    renderError(el, err);
+  }
+}
+
+document.getElementById('interview-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.target;
+  const data = new FormData(form);
+  const skillsTested = String(data.get('skills_tested') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const submitBtn = form.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  try {
+    await getJSON('/interviews', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        company: data.get('company'),
+        role: data.get('role'),
+        round_type: data.get('round_type'),
+        date: `${data.get('date')}T00:00:00Z`,
+        skills_tested: skillsTested,
+        result: data.get('result'),
+      }),
+    });
+    form.reset();
+    form.round_type.value = 'coding';
+    form.result.value = 'pending';
+    loadInterviews();
+  } catch (err) {
+    alert('Could not log this interview: ' + err.message);
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
 loadDiscover();
 loadPriority();
 loadReadinessSummary();
 loadWeakestSkills();
 loadRecommendations();
+loadInterviews();
 </script>
 </body>
 </html>

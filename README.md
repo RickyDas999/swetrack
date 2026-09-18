@@ -505,7 +505,7 @@ section, which names both as anticipated top-level resources.
 A single static, dependency-free HTML page (`src/swetrack/static/dashboard.html`) rendering
 CLAUDE.md's product end-state mockup, served at `GET /` by the same FastAPI app — same-origin
 fetches to the API below it, so no CORS middleware, build step, or frontend framework is
-needed. Read-only except for one write path (tracking a job).
+needed.
 
 - **Discover Jobs** — `POST /recommend` against the example profile; each result gets a
   **Track** button that calls `POST /applications`, then refreshes Top Opportunities.
@@ -513,20 +513,26 @@ needed. Read-only except for one write path (tracking a job).
   rather than letting you track the same job twice.
 - **Top Opportunities** — `GET /applications/priority`, with the `score` and every component
   (`role_fit`, `readiness`, `user_preference`, `compensation_fit`, `deadline_urgency`) visible
-  per application, never collapsed into one opaque number.
+  per application, never collapsed into one opaque number. Each row has a status dropdown +
+  **Update status** button calling `POST /applications/{id}/status`.
 - **Interview Readiness** — `GET /mastery/summary`'s `coding`/`system_design` rollup.
 - **Weakest Skills** — `GET /mastery?top_k=5`, flagging `has_history: false` skills as "(no
   practice yet)" rather than presenting a default as if it were an observed estimate.
 - **Today's Preparation** — `GET /recommendations?top_k=3`, with a "Reason" line naming each
   recommendation's highest-weighted component (e.g. "highest-weighted factor is mastery gap
   (72%)") — derived directly from the real returned components, not generated prose.
+- **Log Interview** — a form (`company`, `role`, `round_type`, `date`, comma-separated
+  `skills_tested`, `result`) calling `POST /interviews`, plus a list of logged interviews via
+  `GET /interviews`. `skills_tested` takes raw canonical skill ids (e.g. `graphs, python`) --
+  no autocomplete against the taxonomy yet, so an unrecognized id surfaces the API's 422
+  directly rather than being silently dropped.
 
 Every panel has its own empty state (e.g. "No tracked applications yet") and error state (e.g.
-"is the API running?") rather than failing silently or showing a blank card. No build tooling,
-no npm, no CDN dependency — plain HTML/CSS/`fetch()` in one file, consistent with CLAUDE.md's
-cost stance and its explicit caution against a "complex frontend redesign." Full read/write UI
-for applications (status transitions) and interviews (logging) is not built here — Swagger UI
-at `/docs` remains the way to exercise those until/unless a UI need for them shows up.
+"is the API running?") rather than failing silently or showing a blank card; every write path
+(track, update status, log interview) reports failures via a plain `alert()` rather than
+failing silently. No build tooling, no npm, no CDN dependency — plain HTML/CSS/`fetch()` in one
+file, consistent with CLAUDE.md's cost stance and its explicit caution against a "complex
+frontend redesign."
 
 ## Docker
 
