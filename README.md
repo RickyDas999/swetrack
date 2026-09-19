@@ -575,7 +575,9 @@ docker run --rm -p 8000:8000 -v swetrack-hf-cache:/root/.cache/huggingface swetr
 Everything across every milestone runs locally and costs $0: TF-IDF is pure scikit-learn; the
 embedding model is a free, locally-run Hugging Face checkpoint; BKT and the heuristic rankers are
 plain Python; persistence is SQLite via SQLAlchemy; experiment tracking uses a local MLflow file
-store. No paid APIs, API keys, or provisioned cloud resources anywhere in the codebase.
+store. No paid APIs, API keys, or provisioned cloud resources anywhere in the codebase. CI
+(`.github/workflows/ci.yml`) runs on GitHub's free Actions minutes -- checkout, install, `pytest`,
+nothing more.
 
 ## Limitations
 

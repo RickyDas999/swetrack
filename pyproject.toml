@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "swetrack"
 version = "0.1.0"
-description = "Content-based job ranking service (TF-IDF and sentence-embedding rankers) for Milestone 1."
+description = "Personalized ML platform for new-grad SWE recruiting and interview preparation: opportunity ranking, application/interview tracking, and skill mastery."
 requires-python = ">=3.11,<3.12"
 readme = "README.md"
 
