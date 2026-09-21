@@ -1,0 +1,29 @@
+# Example Job Radar source registry (Checkpoint 1).
+#
+# Each entry configures one ATS board to poll. `adapter` selects which
+# adapter class handles it (src/swetrack/domains/jobs/adapters/); the
+# identifier field required varies by adapter: `token` (Greenhouse), `site`
+# (Lever, plus optional `region: eu`), or `board_name` (Ashby).
+#
+# Manual URL/pasted-JD import is a separate, on-demand, one-job-at-a-time
+# flow -- not a registry entry. See adapters/manual.py.
+
+sources:
+  - company: Example Co
+    adapter: greenhouse
+    token: exampleco
+    enabled: true
+    poll_minutes: 15
+
+  - company: Example Labs
+    adapter: lever
+    site: examplelabs
+    region: global
+    enabled: true
+    poll_minutes: 15
+
+  - company: Example AI
+    adapter: ashby
+    board_name: exampleai
+    enabled: true
+    poll_minutes: 15

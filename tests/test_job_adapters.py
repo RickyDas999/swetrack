@@ -13,11 +13,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
+import pytest
 
 from swetrack.domains.jobs.adapters.ashby import AshbyAdapter
 from swetrack.domains.jobs.adapters.base import parse_iso_timestamp, strip_html_to_text
 from swetrack.domains.jobs.adapters.greenhouse import GreenhouseAdapter
 from swetrack.domains.jobs.adapters.lever import LeverAdapter
+from swetrack.domains.jobs.adapters.manual import ManualAdapter
 from swetrack.domains.jobs.schemas import NormalizedJob
 
 _FIXTURES_DIR = Path(__file__).parent / "fixtures" / "ats"
@@ -182,6 +184,41 @@ def test_ashby_published_at_missing_maps_to_none() -> None:
     principal = next(job for job in jobs if job.source_job_id == "f1e2d3c4-b5a6-4978-8899-aabbccddeef0")
     assert principal.source_published_at is None
     assert principal.source_updated_at is not None
+
+
+# ---------------------------------------------------------------------------
+# Manual import
+# ---------------------------------------------------------------------------
+
+
+def test_manual_adapter_produces_one_normalized_job() -> None:
+    adapter = ManualAdapter(
+        url="https://example.com/careers/12345",
+        company_name="Example Co",
+        title="Software Engineer, New Grad",
+        description="<p>New grad role.</p>",
+        location="Austin, TX",
+    )
+    jobs = adapter.fetch()
+
+    assert len(jobs) == 1
+    job = jobs[0]
+    assert job.source_type == "manual"
+    assert job.application_url == "https://example.com/careers/12345"
+    assert job.source_url == job.application_url
+    assert job.description_plain == "New grad role."
+    assert job.location_text == "Austin, TX"
+
+
+def test_manual_adapter_source_job_id_is_stable_for_the_same_url() -> None:
+    first = ManualAdapter(url="https://example.com/careers/12345", company_name="Example Co", title="A")
+    second = ManualAdapter(url="https://example.com/careers/12345", company_name="Example Co", title="A")
+    assert first.source_job_id == second.source_job_id
+
+
+def test_manual_adapter_rejects_blank_url() -> None:
+    with pytest.raises(ValueError):
+        ManualAdapter(url="   ", company_name="Example Co", title="A")
 
 
 # ---------------------------------------------------------------------------

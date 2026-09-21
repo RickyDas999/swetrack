@@ -1,4 +1,4 @@
-"""NormalizedJob: the single shape every job-source adapter returns.
+"""NormalizedJob and the source registry entry schema.
 
 Job Radar Checkpoint 1 (SWETrack_Job_Radar_Claude_Code_Handoff.md Sections
 5-7). Adapter output only -- no database identity, first-seen tracking,
@@ -13,9 +13,22 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 SourceType = Literal["greenhouse", "lever", "ashby", "manual"]
+
+# Manual import is a one-off, user-triggered flow (one job at a time via a
+# URL/pasted JD), not something a recurring poll registry entry names --
+# see adapters/manual.py and SWETrack_Job_Radar_Claude_Code_Handoff.md
+# Section 6 (registry vs. manual import are two separate bullets there).
+PollableSourceType = Literal["greenhouse", "lever", "ashby"]
+LeverRegion = Literal["global", "eu"]
+
+_REQUIRED_IDENTIFIER_FIELD: dict[str, str] = {
+    "greenhouse": "token",
+    "lever": "site",
+    "ashby": "board_name",
+}
 
 
 class NormalizedJob(BaseModel):
@@ -42,3 +55,29 @@ class NormalizedJob(BaseModel):
         if not cleaned:
             raise ValueError("required field must not be blank")
         return cleaned
+
+
+class SourceRegistryEntry(BaseModel):
+    """One reviewed, recurring-poll ATS source (SWETrack_Job_Radar_Claude_Code_Handoff.md Section 6).
+
+    Exactly one of ``token``/``site``/``board_name`` is required, matching
+    ``adapter`` -- validated below rather than modeled as three separate
+    subtypes, since the registry YAML is meant to read as one flat list a
+    human reviews and edits directly.
+    """
+
+    company: str = Field(..., min_length=1)
+    adapter: PollableSourceType
+    enabled: bool = True
+    poll_minutes: int = Field(default=15, ge=1)
+    token: str | None = None
+    site: str | None = None
+    region: LeverRegion = "global"
+    board_name: str | None = None
+
+    @model_validator(mode="after")
+    def _identifier_matches_adapter(self) -> "SourceRegistryEntry":
+        required_field = _REQUIRED_IDENTIFIER_FIELD[self.adapter]
+        if not getattr(self, required_field):
+            raise ValueError(f"adapter={self.adapter!r} requires a non-blank {required_field!r} field")
+        return self

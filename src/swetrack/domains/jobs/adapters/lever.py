@@ -2,7 +2,8 @@
 
 SWETrack_Job_Radar_Claude_Code_Handoff.md Section 6.2: a public,
 unauthenticated GET endpoint -- no API key needed.
-``GET https://api.lever.co/v0/postings/{site}?mode=json``
+``GET https://api.lever.co/v0/postings/{site}?mode=json`` (``region="eu"``
+uses ``api.eu.lever.co`` instead, per the handoff's source registry shape).
 
 Unlike Greenhouse/Ashby, the response body is a bare JSON array of postings,
 not wrapped in an object. Lever's public postings API also exposes no
@@ -31,18 +32,21 @@ class LeverAdapter:
         site: str,
         company_name: str,
         *,
+        region: str = "global",
         client: httpx.Client | None = None,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
     ) -> None:
         self.site = site
         self.company_name = company_name
+        self.region = region
         self._client = client
         self._timeout = timeout
 
     def fetch(self) -> list[NormalizedJob]:
         """GET the site's current postings list and map every posting to a NormalizedJob."""
+        host = "api.eu.lever.co" if self.region == "eu" else "api.lever.co"
         postings = http_get_json(
-            f"https://api.lever.co/v0/postings/{self.site}",
+            f"https://{host}/v0/postings/{self.site}",
             params={"mode": "json"},
             client=self._client,
             timeout=self._timeout,
