@@ -2,13 +2,14 @@
 
 Job Radar Checkpoint 1's acceptance criterion
 (SWETrack_Job_Radar_Claude_Code_Handoff.md): "`swetrack jobs sync --dry-run`
-prints normalized jobs without DB writes." This is that command's first
-slice: one source (Greenhouse), one company at a time via CLI flags rather
-than the source registry YAML, which is a later slice
+prints normalized jobs without DB writes." One company at a time via CLI
+flags, rather than the source registry YAML, which is a later slice
 (docs/job-radar-integration-plan.md Section 12). Persistence lands in
 Checkpoint 2, so --dry-run is required until then.
 
-    python scripts/jobs_fetch.py --token exampleco --company "Example Co" --dry-run
+    python scripts/jobs_fetch.py --source greenhouse --token exampleco --company "Example Co" --dry-run
+    python scripts/jobs_fetch.py --source lever --token exampleco --company "Example Co" --dry-run
+    python scripts/jobs_fetch.py --source ashby --token exampleai --company "Example AI" --dry-run
 """
 
 from __future__ import annotations
@@ -16,10 +17,12 @@ from __future__ import annotations
 import argparse
 import sys
 
+from swetrack.domains.jobs.adapters.ashby import AshbyAdapter
 from swetrack.domains.jobs.adapters.greenhouse import GreenhouseAdapter
+from swetrack.domains.jobs.adapters.lever import LeverAdapter
 from swetrack.domains.jobs.schemas import NormalizedJob
 
-_ADAPTERS = {"greenhouse": GreenhouseAdapter}
+_ADAPTERS = {"greenhouse": GreenhouseAdapter, "lever": LeverAdapter, "ashby": AshbyAdapter}
 
 
 def _print_job(job: NormalizedJob) -> None:
@@ -33,7 +36,11 @@ def _print_job(job: NormalizedJob) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--source", default="greenhouse", choices=sorted(_ADAPTERS))
-    parser.add_argument("--token", required=True, help="ATS board token / site identifier")
+    parser.add_argument(
+        "--token",
+        required=True,
+        help="Source identifier: Greenhouse board token, Lever site, or Ashby job-board name",
+    )
     parser.add_argument("--company", required=True, help="Display company name (not returned by the ATS API)")
     parser.add_argument(
         "--dry-run",

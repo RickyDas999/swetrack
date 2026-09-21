@@ -1,0 +1,34 @@
+[
+  {
+    "id": "8e4a2b6c-1111-4a2b-9c3d-abcdef123456",
+    "text": "Software Engineer, New Grad",
+    "categories": {
+      "commitment": "Full-time",
+      "department": "Engineering",
+      "location": "New York"
+    },
+    "country": "USA",
+    "content": {
+      "description": "<p>Join our <strong>new grad</strong> engineering program.</p>"
+    },
+    "hostedUrl": "https://jobs.lever.co/exampleco/8e4a2b6c-1111-4a2b-9c3d-abcdef123456",
+    "applyUrl": "https://jobs.lever.co/exampleco/8e4a2b6c-1111-4a2b-9c3d-abcdef123456/apply",
+    "createdAt": 1768435200000,
+    "workplaceType": "remote"
+  },
+  {
+    "id": "8e4a2b6c-2222-4a2b-9c3d-abcdef123456",
+    "text": "Staff Software Engineer",
+    "categories": {
+      "commitment": "Full-time",
+      "department": "Engineering",
+      "location": "San Francisco"
+    },
+    "content": {
+      "description": "<p>7+ years of experience required.</p>"
+    },
+    "hostedUrl": "https://jobs.lever.co/exampleco/8e4a2b6c-2222-4a2b-9c3d-abcdef123456",
+    "createdAt": 1768000000000,
+    "workplaceType": "on-site"
+  }
+]

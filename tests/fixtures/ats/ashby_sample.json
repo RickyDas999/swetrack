@@ -1,0 +1,28 @@
+{
+  "organizationName": "Example AI",
+  "jobs": [
+    {
+      "id": "f1e2d3c4-b5a6-4978-8899-aabbccddeeff",
+      "title": "Software Engineer, New Grad",
+      "department": "Engineering",
+      "employmentType": "FullTime",
+      "location": "Chicago, IL",
+      "workplaceType": "Hybrid",
+      "descriptionHtml": "<p>Join our <strong>new grad</strong> team.</p>",
+      "publishedAt": "2026-01-14T08:00:00.000Z",
+      "updatedAt": "2026-01-15T09:30:00.000Z",
+      "jobUrl": "https://jobs.ashbyhq.com/exampleai/f1e2d3c4-b5a6-4978-8899-aabbccddeeff"
+    },
+    {
+      "id": "f1e2d3c4-b5a6-4978-8899-aabbccddeef0",
+      "title": "Principal Engineer",
+      "department": "Engineering",
+      "employmentType": "FullTime",
+      "location": "Remote - US",
+      "workplaceType": "Remote",
+      "descriptionPlain": "12+ years of experience required.",
+      "updatedAt": "2026-01-10T09:30:00.000Z",
+      "jobUrl": "https://jobs.ashbyhq.com/exampleai/f1e2d3c4-b5a6-4978-8899-aabbccddeef0"
+    }
+  ]
+}

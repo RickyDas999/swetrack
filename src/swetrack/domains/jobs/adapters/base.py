@@ -1,11 +1,17 @@
-"""Shared adapter interface and text-sanitization helper for every job source."""
+"""Shared adapter interface, HTTP helper, and text-sanitization helper for every job source."""
 
 from __future__ import annotations
 
+from datetime import datetime
 from html.parser import HTMLParser
-from typing import Protocol
+from typing import Any, Protocol
+
+import httpx
 
 from swetrack.domains.jobs.schemas import NormalizedJob
+
+USER_AGENT = "SWETrack-JobRadar/0.1 (personal, non-commercial job search tool)"
+DEFAULT_TIMEOUT_SECONDS = 10.0
 
 
 class SourceAdapter(Protocol):
@@ -19,6 +25,45 @@ class SourceAdapter(Protocol):
     source_type: str
 
     def fetch(self) -> list[NormalizedJob]: ...
+
+
+def http_get_json(
+    url: str,
+    *,
+    params: dict[str, str] | None = None,
+    client: httpx.Client | None = None,
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+) -> Any:
+    """GET ``url`` and return its parsed JSON body.
+
+    Reuses ``client`` when given one (e.g. one wired to an
+    ``httpx.MockTransport`` in tests, per
+    SWETrack_Job_Radar_Claude_Code_Handoff.md Section 17: "CI must not depend
+    on live ATS availability"); otherwise opens and closes a short-lived
+    client for this one request.
+    """
+    owned_client = client or httpx.Client(timeout=timeout, headers={"User-Agent": USER_AGENT})
+    try:
+        response = owned_client.get(url, params=params)
+        response.raise_for_status()
+        return response.json()
+    finally:
+        if client is None:
+            owned_client.close()
+
+
+def parse_iso_timestamp(value: str | None) -> datetime | None:
+    """Parse an ISO-8601 timestamp from an ATS payload, or None for missing/malformed input.
+
+    Never raises: this is untrusted external data, and one unexpected date
+    format on one job must not fail an entire sync.
+    """
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
 
 
 class _TextExtractor(HTMLParser):

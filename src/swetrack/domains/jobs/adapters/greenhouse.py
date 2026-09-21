@@ -12,16 +12,17 @@ field.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 import httpx
 
-from swetrack.domains.jobs.adapters.base import strip_html_to_text
+from swetrack.domains.jobs.adapters.base import (
+    DEFAULT_TIMEOUT_SECONDS,
+    http_get_json,
+    parse_iso_timestamp,
+    strip_html_to_text,
+)
 from swetrack.domains.jobs.schemas import NormalizedJob
-
-_USER_AGENT = "SWETrack-JobRadar/0.1 (personal, non-commercial job search tool)"
-_DEFAULT_TIMEOUT_SECONDS = 10.0
 
 
 class GreenhouseAdapter:
@@ -35,7 +36,7 @@ class GreenhouseAdapter:
         company_name: str,
         *,
         client: httpx.Client | None = None,
-        timeout: float = _DEFAULT_TIMEOUT_SECONDS,
+        timeout: float = DEFAULT_TIMEOUT_SECONDS,
     ) -> None:
         self.board_token = board_token
         self.company_name = company_name
@@ -44,16 +45,12 @@ class GreenhouseAdapter:
 
     def fetch(self) -> list[NormalizedJob]:
         """GET the board's current job list and map every job to a NormalizedJob."""
-        url = f"https://boards-api.greenhouse.io/v1/boards/{self.board_token}/jobs"
-        client = self._client or httpx.Client(timeout=self._timeout, headers={"User-Agent": _USER_AGENT})
-        owns_client = self._client is None
-        try:
-            response = client.get(url, params={"content": "true"})
-            response.raise_for_status()
-            payload = response.json()
-        finally:
-            if owns_client:
-                client.close()
+        payload = http_get_json(
+            f"https://boards-api.greenhouse.io/v1/boards/{self.board_token}/jobs",
+            params={"content": "true"},
+            client=self._client,
+            timeout=self._timeout,
+        )
         return [self._to_normalized_job(job) for job in payload.get("jobs", [])]
 
     def _to_normalized_job(self, job: dict[str, Any]) -> NormalizedJob:
@@ -71,21 +68,7 @@ class GreenhouseAdapter:
             description_plain=strip_html_to_text(job.get("content", "")),
             application_url=url,
             source_url=url,
-            source_published_at=_parse_timestamp(job.get("first_published")),
-            source_updated_at=_parse_timestamp(job.get("updated_at")),
+            source_published_at=parse_iso_timestamp(job.get("first_published")),
+            source_updated_at=parse_iso_timestamp(job.get("updated_at")),
             raw_payload=job,
         )
-
-
-def _parse_timestamp(value: str | None) -> datetime | None:
-    """Parse a Greenhouse ISO-8601 timestamp, or None for missing/malformed input.
-
-    Never raises: this is untrusted external data, and one unexpected date
-    format on one job must not fail an entire sync.
-    """
-    if not value:
-        return None
-    try:
-        return datetime.fromisoformat(value)
-    except ValueError:
-        return None
