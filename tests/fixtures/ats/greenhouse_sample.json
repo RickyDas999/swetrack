@@ -1,0 +1,35 @@
+{
+  "jobs": [
+    {
+      "id": 5658822003,
+      "title": "Software Engineer, New Grad 2026",
+      "updated_at": "2026-01-15T09:30:00-05:00",
+      "first_published": "2026-01-14T08:00:00-05:00",
+      "location": { "name": "New York, NY" },
+      "absolute_url": "https://boards.greenhouse.io/exampleco/jobs/5658822003",
+      "content": "<p>We are looking for a <strong>new grad</strong> Software Engineer to join our backend team.</p><p>Requirements: Python, SQL, REST APIs.</p>",
+      "offices": [{ "id": 1, "name": "New York" }],
+      "departments": [{ "id": 1, "name": "Engineering" }]
+    },
+    {
+      "id": 5658822004,
+      "title": "Senior Staff Engineer",
+      "updated_at": "2026-01-10T09:30:00-05:00",
+      "location": { "name": "Remote - US" },
+      "absolute_url": "https://boards.greenhouse.io/exampleco/jobs/5658822004",
+      "content": "<p>10+ years experience required.</p>",
+      "offices": [],
+      "departments": [{ "id": 1, "name": "Engineering" }]
+    },
+    {
+      "id": 5658822005,
+      "title": "Backend Engineer I",
+      "updated_at": "2026-01-12T09:30:00-05:00",
+      "absolute_url": "https://boards.greenhouse.io/exampleco/jobs/5658822005",
+      "content": "<p>Entry level backend role.</p>",
+      "offices": [{ "id": 2, "name": "Chicago, IL" }],
+      "departments": []
+    }
+  ],
+  "meta": { "total": 3 }
+}
