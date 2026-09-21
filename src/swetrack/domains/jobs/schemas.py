@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 SourceType = Literal["greenhouse", "lever", "ashby", "manual"]
 
@@ -81,3 +81,20 @@ class SourceRegistryEntry(BaseModel):
         if not getattr(self, required_field):
             raise ValueError(f"adapter={self.adapter!r} requires a non-blank {required_field!r} field")
         return self
+
+
+class SyncResult(BaseModel):
+    """Summary of one ``sync_source()`` call.
+
+    SWETrack_Job_Radar_Claude_Code_Handoff.md's "Add sync metrics and
+    structured logs" (Checkpoint 2).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    source_type: str
+    total_fetched: int = Field(ge=0)
+    new_count: int = Field(ge=0)
+    updated_count: int = Field(ge=0)
+    unchanged_count: int = Field(ge=0)
+    duplicate_count: int = Field(ge=0)

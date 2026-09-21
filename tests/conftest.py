@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from swetrack.domains.applications import models as _applications_models  # noqa: F401 -- registers tables
 from swetrack.domains.interviews import models as _interviews_models  # noqa: F401 -- registers tables
+from swetrack.domains.jobs import models as _jobs_models  # noqa: F401 -- registers tables
 from swetrack.domains.learning import models as _learning_models  # noqa: F401 -- registers tables
 from swetrack.infrastructure.database.base import get_engine, get_sessionmaker, init_db
 

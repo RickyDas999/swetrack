@@ -1,9 +1,10 @@
 """Application pipeline service layer: the only way callers write to this domain.
 
-``create_application`` validates ``job_id`` against the on-disk job corpus
-(the same source ``opportunities`` reads from -- jobs are not database-backed
-yet), mirroring how ``learning.services.create_activity`` validates
-``skill_ids`` against the canonical skill taxonomy.
+``create_application`` validates ``job_id`` against either the on-disk
+sample job corpus (the same source ``opportunities`` reads from) or a
+persisted, DB-backed discovered job (Job Radar Checkpoint 2) -- mirroring
+how ``learning.services.create_activity`` validates ``skill_ids`` against
+the canonical skill taxonomy.
 
 No ML here (CLAUDE.md Phase 12: "Avoid premature ML on application outcomes
 until enough real data exists") and no enforced status transition graph:
@@ -22,15 +23,18 @@ from sqlalchemy.orm import Session
 
 from swetrack.domains.applications.models import ApplicationRecord, ApplicationStatusEventRecord
 from swetrack.domains.applications.schemas import Application, ApplicationStatus, ApplicationStatusEvent
+from swetrack.domains.jobs.models import DiscoveredJobRecord
 from swetrack.domains.opportunities.config import DataLoadError, load_jobs
 
 
-def _job_exists(job_id: str) -> bool:
+def _job_exists(session: Session, job_id: str) -> bool:
     try:
         jobs = load_jobs()
+        if any(job.job_id == job_id for job in jobs):
+            return True
     except DataLoadError:
-        return False
-    return any(job.job_id == job_id for job in jobs)
+        pass
+    return session.query(DiscoveredJobRecord).filter(DiscoveredJobRecord.canonical_key == job_id).first() is not None
 
 
 def create_application(
@@ -46,7 +50,7 @@ def create_application(
     the ``ApplicationRecord`` and its creation ``ApplicationStatusEventRecord``
     commit together or not at all.
     """
-    if not _job_exists(job_id):
+    if not _job_exists(session, job_id):
         raise ValueError(f"Unknown job id: {job_id!r}")
 
     try:
