@@ -1,0 +1,272 @@
+evidence:
+- id: amazon-web-services-aws-1
+  section: experience
+  organization: Amazon Web Services (AWS)
+  role: Software Development Engineer Intern -- Amazon Linux Builder Experience
+  date_range: May 2025 -- Aug. 2025
+  base_text: Architected and built TrackPoint, a serverless workflow state-management platform using Java,
+    AWS Lambda, API Gateway, and DynamoDB to maintain current and historical task state across 500K+ annual
+    workflows.
+  supported_skills:
+  - API Gateway
+  - AWS Lambda
+  - DynamoDB
+  - Java
+  - TrackPoint
+  - serverless workflow state-management platform
+  supported_metrics:
+  - 500K+ annual workflows
+  verified: true
+  enabled: true
+  review_note: ''
+- id: amazon-web-services-aws-2
+  section: experience
+  organization: Amazon Web Services (AWS)
+  role: Software Development Engineer Intern -- Amazon Linux Builder Experience
+  date_range: May 2025 -- Aug. 2025
+  base_text: Designed a versioned DynamoDB data model supporting current-state and immutable task history,
+    optimizing access patterns to reduce read amplification under high-volume queries.
+  supported_skills:
+  - DynamoDB
+  - optimizing access patterns
+  - reduce read amplification under high-volume
+  supported_metrics: []
+  verified: true
+  enabled: true
+  review_note: ''
+- id: amazon-web-services-aws-3
+  section: experience
+  organization: Amazon Web Services (AWS)
+  role: Software Development Engineer Intern -- Amazon Linux Builder Experience
+  date_range: May 2025 -- Aug. 2025
+  base_text: Built an event-driven audit pipeline using DynamoDB Streams and Lambda to automatically capture
+    task changes, completion dates, and historical metadata.
+  supported_skills:
+  - DynamoDB Streams
+  - Lambda
+  - event-driven audit pipeline
+  supported_metrics: []
+  verified: true
+  enabled: true
+  review_note: ''
+- id: amazon-web-services-aws-4
+  section: experience
+  organization: Amazon Web Services (AWS)
+  role: Software Development Engineer Intern -- Amazon Linux Builder Experience
+  date_range: May 2025 -- Aug. 2025
+  base_text: Developed query capabilities across 100+ task attributes, enabling teams to surface delayed
+    workflows and investigate status changes programmatically.
+  supported_skills:
+  - query capabilities
+  - surface delayed workflows
+  supported_metrics:
+  - 100+ task attributes
+  verified: true
+  enabled: true
+  review_note: ''
+- id: amazon-web-services-aws-5
+  section: experience
+  organization: Amazon Web Services (AWS)
+  role: Software Development Engineer Intern -- Amazon Linux Builder Experience
+  date_range: May 2025 -- Aug. 2025
+  base_text: Automated previously manual reporting workflows, reducing stakeholder reporting effort by
+    80% and saving 100+ engineering/program-management hours per week.
+  supported_skills:
+  - Automated previously manual
+  supported_metrics:
+  - 100+ engineering/program-management hours per week
+  - 80%
+  verified: true
+  enabled: true
+  review_note: ''
+- id: amazon-web-services-aws-6
+  section: experience
+  organization: Amazon Web Services (AWS)
+  role: Software Development Engineer Intern -- Amazon Linux Builder Experience
+  date_range: May 2025 -- Aug. 2025
+  base_text: Shipped TrackPoint through AWS's internal build and deployment pipeline using CDK-managed
+    infrastructure, staged deployments, integration testing, and CloudWatch monitoring/alarms to monitor
+    API and Lambda reliability.
+  supported_skills:
+  - API
+  - CDK-managed infrastructure
+  - CloudWatch
+  - Lambda reliability
+  - TrackPoint
+  supported_metrics: []
+  verified: true
+  enabled: true
+  review_note: ''
+- id: johnson-johnson-1
+  section: experience
+  organization: Johnson & Johnson
+  role: Software Asset Management Specialist Intern
+  date_range: May 2024 -- Aug. 2024
+  base_text: Built a Python generative-AI assistant for enterprise data catalogs, enabling employees to
+    discover and query internal data resources, projecting 72K–128K hours of annual productivity savings.
+  supported_skills:
+  - Python generative-AI
+  supported_metrics:
+  - 72K–128K hours of annual productivity savings.
+  verified: true
+  enabled: true
+  review_note: ''
+- id: johnson-johnson-2
+  section: experience
+  organization: Johnson & Johnson
+  role: Software Asset Management Specialist Intern
+  date_range: May 2024 -- Aug. 2024
+  base_text: Developed Power BI dashboards analyzing global software purchasing data, surfacing $100M+
+    in previously unreported spend and improving cost and risk visibility.
+  supported_skills:
+  - Power BI
+  - improving cost
+  - risk visibility
+  supported_metrics:
+  - $100M+
+  verified: true
+  enabled: true
+  review_note: ''
+- id: johnson-johnson-3
+  section: experience
+  organization: Johnson & Johnson
+  role: Software Asset Management Specialist Intern
+  date_range: May 2024 -- Aug. 2024
+  base_text: Identified $18K+ in software cost avoidance through analysis of rejected and idle license
+    requests and documented the process for continued use.
+  supported_skills:
+  - documented the process for continued use
+  supported_metrics:
+  - $18K+ in software cost avoidance
+  verified: true
+  enabled: true
+  review_note: ''
+- id: food-for-all-1
+  section: experience
+  organization: Food For All
+  role: Founder and President
+  date_range: Mar. 2020 -- Present
+  base_text: Founded and led a community nonprofit coordinating food drives for the Somerset County Food
+    Bank, collecting 4,500+ lbs of donations through local campaigns and partnerships.
+  supported_skills:
+  - Founded
+  - led
+  supported_metrics:
+  - 4,500+
+  verified: true
+  enabled: true
+  review_note: ''
+- id: capital-one-fraud-detection-capstone-1
+  section: project
+  organization: Capital One -- Fraud Detection (Capstone)
+  role: ''
+  date_range: ''
+  base_text: Built an end-to-end fraud detection platform using a Random Forest model trained on 1M+ simulated
+    credit card transactions, achieving 99.3%+ accuracy.
+  supported_skills:
+  - end-to-end fraud detection platform
+  supported_metrics:
+  - 99.3%+ accuracy
+  - Random Forest model trained on 1M+ simulated credit card transactions
+  verified: true
+  enabled: true
+  review_note: ''
+- id: capital-one-fraud-detection-capstone-2
+  section: project
+  organization: Capital One -- Fraud Detection (Capstone)
+  role: ''
+  date_range: ''
+  base_text: Engineered a serverless REST API using AWS API Gateway and Lambda for user and transaction
+    management and real-time fraud scoring.
+  supported_skills:
+  - AWS API Gateway
+  - Lambda
+  - real-time fraud scoring
+  - serverless REST API
+  supported_metrics: []
+  verified: true
+  enabled: true
+  review_note: ''
+- id: capital-one-fraud-detection-capstone-3
+  section: project
+  organization: Capital One -- Fraud Detection (Capstone)
+  role: ''
+  date_range: ''
+  base_text: Integrated WhatsApp alerts through Meta Cloud API to notify users when transactions exceeded
+    configurable fraud thresholds.
+  supported_skills:
+  - WhatsApp alerts through Meta Cloud API
+  supported_metrics: []
+  verified: true
+  enabled: true
+  review_note: ''
+- id: swetrack-swe-recruiting-platform-1
+  section: project
+  organization: SWETrack -- SWE Recruiting Platform
+  role: ''
+  date_range: ''
+  base_text: Built a full-stack platform centralizing software-engineering job tracking, LeetCode preparation,
+    System Design practice, and recruiting analytics into a personalized workflow.
+  supported_skills:
+  - full-stack platform
+  supported_metrics: []
+  verified: true
+  enabled: true
+  review_note: ''
+- id: swetrack-swe-recruiting-platform-2
+  section: project
+  organization: SWETrack -- SWE Recruiting Platform
+  role: ''
+  date_range: ''
+  base_text: Developed a semantic recommendation pipeline using Sentence Transformers, embeddings, and
+    behavioral signals to rank job opportunities and surface preparation gaps; Evaluated ranking quality
+    with Precision@K, NDCG@K, and MLflow.
+  supported_skills:
+  - MLflow
+  - NDCG@K
+  - Precision@K
+  - Sentence Transformers
+  - behavioral signals
+  - embeddings
+  - semantic recommendation pipeline
+  supported_metrics: []
+  verified: true
+  enabled: true
+  review_note: ''
+- id: swetrack-swe-recruiting-platform-3
+  section: project
+  organization: SWETrack -- SWE Recruiting Platform
+  role: ''
+  date_range: ''
+  base_text: Engineered a FastAPI backend and normalized PostgreSQL data model for jobs, applications,
+    interview activity, preparation history, and user preferences, exposing validated APIs across platform
+    workflows.
+  supported_skills:
+  - FastAPI backend
+  - PostgreSQL
+  supported_metrics: []
+  verified: false
+  enabled: false
+  review_note: 'DISCREPANCY (Job Radar Checkpoint 0/5 audit): the actual SWETrack repo uses SQLite by
+    default via SQLAlchemy (SWETRACK_DATABASE_URL can point at Postgres later, but that is not the
+    verified/deployed state). Update this bullet to say SQLite (or "SQLAlchemy/SQLite") before
+    re-enabling, per CLAUDE.md: "Only include claims corresponding to completed functionality."'
+- id: swetrack-swe-recruiting-platform-4
+  section: project
+  organization: SWETrack -- SWE Recruiting Platform
+  role: ''
+  date_range: ''
+  base_text: Built a responsive React UI and containerized the application with Docker, backed by automated
+    unit and integration testing.
+  supported_skills:
+  - Docker
+  - React UI
+  - automated unit
+  - integration testing.
+  supported_metrics: []
+  verified: false
+  enabled: false
+  review_note: 'DISCREPANCY (Job Radar Checkpoint 0/5 audit): the actual SWETrack repo has no React
+    frontend -- it serves a single static, dependency-free HTML dashboard (src/swetrack/static/dashboard.html),
+    a deliberate choice per CLAUDE.md ("no complex frontend redesign"). Update this bullet to describe
+    the real dashboard before re-enabling.'

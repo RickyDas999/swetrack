@@ -30,6 +30,8 @@ config/candidate_profile.yaml
 config/*.local.yaml
 *.resume
 *.pdf
+resume/master_resume.tex
+resume/variants/
 
 # Test / coverage artifacts
 .pytest_cache/
