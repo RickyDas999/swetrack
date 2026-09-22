@@ -43,6 +43,8 @@ def test_application_priority_endpoint_returns_score_and_components(client):
     assert set(body["components"].keys()) == {
         "role_fit",
         "readiness",
+        "freshness",
+        "new_grad_confidence",
         "user_preference",
         "company_interest",
         "compensation_fit",

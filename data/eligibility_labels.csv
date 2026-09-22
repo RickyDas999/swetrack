@@ -1,0 +1,31 @@
+job_id,title,description,true_status
+ELIG-001,"Software Engineer, New Grad 2026","We are excited to welcome our 2026 new graduates to build backend services in Python.",eligible
+ELIG-002,Entry Level Backend Engineer,"Entry level position for recent graduates. 0-2 years experience with Python and SQL.",eligible
+ELIG-003,Software Engineer I,"Join our engineering team building scalable REST APIs.",eligible
+ELIG-004,Associate Software Engineer,"We welcome candidates from the Class of 2026.",eligible
+ELIG-005,University Grad - Software Developer,"Open to university graduates with a CS degree.",eligible
+ELIG-006,Campus Hire: Software Engineer,"Our campus hire program is for early career engineers.",eligible
+ELIG-007,Software Engineer (New Grad Program),"Recent graduate program, 0-2 years of experience preferred.",eligible
+ELIG-008,"Full Stack Engineer, Early Career","Early career full stack engineer role on our platform team.",eligible
+ELIG-009,Software Developer I,"Entry point role for the engineering team building internal tools.",eligible
+ELIG-010,Backend Engineer - University Hire,"University hire program, 0-3 years experience with distributed systems.",eligible
+ELIG-011,"Software Engineer, New Grad (Boomerang Posting)","Software Engineer, New Grad 2026 -- duplicate cross-posting of an earlier requisition.",eligible
+ELIG-012,Senior Software Engineer,"10+ years of experience required. Lead architecture decisions for our platform.",ineligible
+ELIG-013,Staff Engineer,"8+ years of experience. Staff-level technical leadership across teams.",ineligible
+ELIG-014,Engineering Manager,"5+ years managing engineering teams and delivering roadmaps.",ineligible
+ELIG-015,Principal Software Architect,"15+ years of experience designing distributed systems at scale.",ineligible
+ELIG-016,Director of Engineering,"Lead our engineering organization. 12+ years of experience required.",ineligible
+ELIG-017,Software Engineering Intern (Summer 2026),"10-week summer internship for current students.",ineligible
+ELIG-018,Backend Engineering Co-op (Fall 2026),"Co-op rotation for undergraduate students currently enrolled in school.",ineligible
+ELIG-019,Senior Backend Engineer,"Minimum 6 years of experience with distributed systems required.",ineligible
+ELIG-020,Software Engineer (Security Clearance Required),"Active security clearance required for this defense contract role.",ineligible
+ELIG-021,Lead Full Stack Developer,"Looking for a lead to own our full stack platform end to end.",ineligible
+ELIG-022,Software Engineer,"Build and maintain internal tools used across the company.",uncertain
+ELIG-023,Backend Developer,"Work with our backend team on microservices and APIs.",uncertain
+ELIG-024,Cloud Engineer,"Manage cloud infrastructure and deployments on AWS.",uncertain
+ELIG-025,Platform Engineer,"Own and evolve our internal developer platform.",uncertain
+ELIG-026,Software Engineer (Flexible Experience),"0-2 years preferred, but we will also consider candidates with 8+ years for a more senior scope.",uncertain
+ELIG-027,Full Stack Engineer,"1-10 years of experience welcome depending on role scope; strong candidates from any background considered.",uncertain
+ELIG-028,Data Engineer,"Build data pipelines. Experience with SQL and Python is a plus.",uncertain
+ELIG-029,Machine Learning Engineer,"Design and deploy machine learning models in production.",uncertain
+ELIG-030,QA Engineer,"Ensure product quality through manual and automated testing.",uncertain

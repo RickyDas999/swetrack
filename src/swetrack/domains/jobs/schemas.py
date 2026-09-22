@@ -83,6 +83,41 @@ class SourceRegistryEntry(BaseModel):
         return self
 
 
+class WorkAuthorization(BaseModel):
+    """Candidate work-authorization facts (SWETrack_Job_Radar_Claude_Code_Handoff.md Section 3)."""
+
+    country: str = "US"
+    sponsorship_required: bool = False
+
+
+class CandidateEligibilityProfile(BaseModel):
+    """Non-ranking candidate identity used only for hard eligibility gating.
+
+    Deliberately separate from opportunities.models.CandidateProfile (see
+    docs/job-radar-integration-plan.md Section 3): CandidateProfile is a
+    ranking-text input consumed by TF-IDF/embedding similarity -- nothing
+    here is used for similarity scoring, only for the deterministic
+    new-grad eligibility classifier (eligibility.py).
+
+    ``graduation_year``/``graduation_month`` (two ints) stand in for the
+    handoff's ``graduation_date: 2026-05`` partial date -- simpler than a
+    custom "YYYY-MM" parser for a value nothing here needs as a full date.
+    """
+
+    name: str = Field(..., min_length=1)
+    graduation_year: int = Field(..., ge=2000, le=2100)
+    graduation_month: int = Field(default=5, ge=1, le=12)
+    degree: str = ""
+    school: str = ""
+    work_authorization: WorkAuthorization = Field(default_factory=WorkAuthorization)
+    target_roles: list[str] = Field(default_factory=list)
+    secondary_roles: list[str] = Field(default_factory=list)
+    excluded_levels: list[str] = Field(default_factory=list)
+    preferred_locations: list[str] = Field(default_factory=list)
+    accepts_other_us_locations: bool = True
+    accepts_remote_us: bool = True
+
+
 class SyncResult(BaseModel):
     """Summary of one ``sync_source()`` call.
 

@@ -12,6 +12,7 @@ nobody has needed yet.
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 _WHITESPACE_RE = re.compile(r"\s+")
@@ -46,6 +47,22 @@ def cross_source_key(company_name: str, title: str, location_text: str) -> str:
     duplicate only when description similarity or official URL also agrees."
     """
     return "|".join((normalize_company_name(company_name), normalize_title(title), normalize_location(location_text)))
+
+
+def ensure_utc(value: datetime | None) -> datetime | None:
+    """Treat a naive datetime as UTC.
+
+    SQLite has no native timezone-aware storage: a ``DateTime(timezone=True)``
+    column round-trips as naive once the original in-memory ORM object is
+    garbage collected and a fresh query re-loads the row (a SQLAlchemy+SQLite
+    limitation, not specific to this table). Every timestamp this project
+    writes is UTC, so a naive value read back is treated as already-UTC
+    rather than compared/subtracted against a tz-aware one and raising
+    ``TypeError``.
+    """
+    if value is None or value.tzinfo is not None:
+        return value
+    return value.replace(tzinfo=timezone.utc)
 
 
 def strip_tracking_params(url: str) -> str:

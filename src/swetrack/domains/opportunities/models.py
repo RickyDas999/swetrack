@@ -12,7 +12,11 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 RankerName = Literal["tfidf", "embedding"]
-JobSource = Literal["sample", "synthetic"]
+# "discovered" (Job Radar): a real job ingested from a live ATS source or
+# manual import, as opposed to "sample"/"synthetic" demonstration data --
+# CLAUDE.md's "honest metrics... no fabricated claims" applies to provenance
+# labels too.
+JobSource = Literal["sample", "synthetic", "discovered"]
 
 
 def _clean_str_list(value: object) -> list[str]:

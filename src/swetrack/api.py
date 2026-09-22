@@ -45,6 +45,7 @@ from swetrack.domains.applications.services import (
 from swetrack.domains.interviews.schemas import CreateInterviewRequest, Interview
 from swetrack.domains.interviews.schemas import RoundType as RoundTypeType
 from swetrack.domains.interviews.services import create_interview, get_interview, list_interviews
+from swetrack.domains.jobs.services import list_discovered_job_records
 from swetrack.domains.learning.schemas import InterviewReadinessSummary, SkillMasterySummary, StudyRecommendation
 from swetrack.domains.learning.services import (
     get_interview_readiness_summary,
@@ -93,6 +94,21 @@ def _build_ranker(name: str) -> Ranker:
     return TfidfRanker()
 
 
+def _load_all_jobs(session: Session) -> list[JobRecord]:
+    """Sample/CSV jobs plus every persisted, non-duplicate Job Radar discovered job.
+
+    Centralizes the try/except around `load_jobs()` that every job-reading
+    endpoint below previously repeated, and is the one place discovered
+    jobs (Job Radar Checkpoint 3) join the existing ranking/readiness/
+    priority pipeline -- see docs/job-radar-integration-plan.md Section 7.
+    """
+    try:
+        sample_jobs = load_jobs()
+    except DataLoadError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return sample_jobs + list_discovered_job_records(session)
+
+
 _STATIC_DIR = find_repo_root() / "src" / "swetrack" / "static"
 
 
@@ -112,24 +128,19 @@ def health() -> HealthResponse:
 def get_jobs(
     limit: int | None = Query(default=None, ge=1),
     offset: int = Query(default=0, ge=0),
+    session: Session = Depends(get_db_session),
 ) -> list[JobRecord]:
-    """Return available job metadata, optionally paginated with limit/offset."""
-    try:
-        jobs = load_jobs()
-    except DataLoadError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    """Return available job metadata (sample + Job Radar discovered), optionally paginated."""
+    jobs = _load_all_jobs(session)
     if limit is None:
         return jobs[offset:]
     return jobs[offset : offset + limit]
 
 
 @app.post("/recommend", response_model=RecommendResponse)
-def recommend(request: RecommendRequest) -> RecommendResponse:
+def recommend(request: RecommendRequest, session: Session = Depends(get_db_session)) -> RecommendResponse:
     """Rank jobs against a supplied (or explicitly requested example) candidate profile."""
-    try:
-        jobs = load_jobs()
-    except DataLoadError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    jobs = _load_all_jobs(session)
 
     if request.top_k > len(jobs):
         raise HTTPException(
@@ -162,10 +173,7 @@ def get_readiness(
     auth/user concept (CLAUDE.md explicitly avoids that), so the example
     profile is the only candidate representation available.
     """
-    try:
-        jobs = load_jobs()
-    except DataLoadError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    jobs = _load_all_jobs(session)
 
     job = next((candidate for candidate in jobs if candidate.job_id == job_id), None)
     if job is None:
@@ -216,12 +224,7 @@ def get_applications_priority(
     never matched as an application_id path parameter.
     """
     applications = list_applications(session, status=status)
-
-    try:
-        jobs = load_jobs()
-    except DataLoadError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-    jobs_by_id = {job.job_id: job for job in jobs}
+    jobs_by_id = {job.job_id: job for job in _load_all_jobs(session)}
 
     try:
         profile = load_candidate_profile()
@@ -282,10 +285,7 @@ def get_application_priority(
     if application is None:
         raise HTTPException(status_code=404, detail=f"Unknown application_id: {application_id!r}")
 
-    try:
-        jobs = load_jobs()
-    except DataLoadError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    jobs = _load_all_jobs(session)
 
     job = next((candidate for candidate in jobs if candidate.job_id == application.job_id), None)
     if job is None:

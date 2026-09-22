@@ -1,5 +1,7 @@
-"""The only write path to discovered_jobs: idempotent upsert, revision
-handling, cross-source duplicate flagging, and application auto-creation.
+"""The only write path to discovered_jobs (idempotent upsert, revision
+handling, cross-source duplicate flagging, application auto-creation), plus
+the read-side conversion into the shape the existing ranking/readiness/
+priority pipeline already consumes.
 
 SWETrack_Job_Radar_Claude_Code_Handoff.md Section 8 (normalization/dedup)
 and Checkpoint 2 (persistence). A newly-discovered, non-duplicate job
@@ -21,6 +23,7 @@ from swetrack.domains.applications.services import create_application
 from swetrack.domains.jobs.models import DiscoveredJobRecord
 from swetrack.domains.jobs.normalize import cross_source_key, strip_tracking_params
 from swetrack.domains.jobs.schemas import NormalizedJob, SyncResult
+from swetrack.domains.opportunities.models import JobRecord
 
 logger = logging.getLogger(__name__)
 
@@ -150,3 +153,47 @@ def _descriptions_match(a: str, b: str) -> bool:
     if not a or not b:
         return False
     return SequenceMatcher(None, a, b).ratio() >= _DESCRIPTION_SIMILARITY_THRESHOLD
+
+
+def to_job_record(record: DiscoveredJobRecord) -> JobRecord:
+    """Convert a persisted discovered job into the shape ranking/readiness/priority already consume.
+
+    ``JobRecord`` (opportunities.models) is the one shape ``Ranker.score_jobs``,
+    ``compute_readiness``, and ``compute_application_priority`` already
+    accept -- docs/job-radar-integration-plan.md Section 7. ``job_id`` is
+    the ``canonical_key``, matching what ``ApplicationRecord.job_id`` stores
+    for jobs discovered this way (Section 6).
+
+    ``skills=[]``: Job Radar does not extract structured skills from JD text
+    yet, so Role Fit still works (it also scores the free-text
+    title/description), but Readiness for a discovered job is currently a
+    placeholder ``1.0`` ("nothing to be unprepared for") until a future
+    checkpoint adds skill extraction -- see the Checkpoint 3 summary's Known
+    Limitations, not a claim that a discovered job has no skill
+    requirements.
+    """
+    return JobRecord(
+        job_id=record.canonical_key,
+        company=record.company_name,
+        title=record.title,
+        location=record.location_text,
+        description=record.description_plain,
+        skills=[],
+        experience_level="",
+        url=record.application_url,
+        source="discovered",
+    )
+
+
+def list_discovered_job_records(session: Session, *, include_duplicates: bool = False) -> list[JobRecord]:
+    """Every persisted discovered job as a JobRecord, ready for the existing ranking pipeline.
+
+    Excludes cross-source duplicates by default: a duplicate row does not
+    get its own tracked application (see sync_source), so it is not a
+    distinct actionable item for a caller like the job listing/ranking
+    endpoints.
+    """
+    query = session.query(DiscoveredJobRecord)
+    if not include_duplicates:
+        query = query.filter(DiscoveredJobRecord.duplicate_of_id.is_(None))
+    return [to_job_record(record) for record in query.all()]

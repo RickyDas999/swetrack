@@ -1,0 +1,46 @@
+# Candidate eligibility profile (Job Radar Checkpoint 3).
+#
+# Non-ranking identity facts used only by the deterministic new-grad
+# eligibility classifier (src/swetrack/domains/jobs/eligibility.py) -- kept
+# separate from config/candidate_profile.example.yaml, which is the
+# ranking-text input consumed by TF-IDF/embedding similarity. See
+# docs/job-radar-integration-plan.md Section 3.
+
+name: Subham Das
+graduation_year: 2026
+graduation_month: 5
+degree: B.S. Computer Sciences
+school: University of Wisconsin-Madison
+
+work_authorization:
+  country: US
+  sponsorship_required: false
+
+target_roles:
+  - Software Engineer
+  - Software Developer
+  - Backend Engineer
+  - Full-Stack Engineer
+  - Product Software Engineer
+  - Cloud Engineer
+  - Platform Engineer
+
+secondary_roles:
+  - AI Software Engineer
+  - ML Platform Engineer
+
+excluded_levels:
+  - Senior
+  - Staff
+  - Principal
+  - Manager
+  - Director
+  - Lead
+
+preferred_locations:
+  - New York City
+  - New Jersey
+  - Chicago
+
+accepts_other_us_locations: true
+accepts_remote_us: true

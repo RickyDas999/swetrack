@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from swetrack.domains.applications.services import create_application, list_applications
 from swetrack.domains.jobs.models import DiscoveredJobRecord
 from swetrack.domains.jobs.schemas import NormalizedJob
-from swetrack.domains.jobs.services import sync_source
+from swetrack.domains.jobs.services import list_discovered_job_records, sync_source
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -166,3 +166,37 @@ def test_discovered_job_can_be_tracked_like_any_other_application(db_session: Se
     # DB-backed discovered jobs, not just the sample CSV.
     application, _ = create_application(db_session, job_id="greenhouse:1", status="interested")
     assert application.job_id == "greenhouse:1"
+
+
+def test_list_discovered_job_records_converts_to_job_record_shape(db_session: Session) -> None:
+    sync_source(db_session, source_type="greenhouse", jobs=[_job()])
+
+    records = list_discovered_job_records(db_session)
+
+    assert len(records) == 1
+    record = records[0]
+    assert record.job_id == "greenhouse:1"
+    assert record.company == "Example Co"
+    assert record.title == "Software Engineer, New Grad"
+    assert record.source == "discovered"
+
+
+def test_list_discovered_job_records_excludes_duplicates_by_default(db_session: Session) -> None:
+    greenhouse_job = _job(
+        source_type="greenhouse",
+        source_job_id="1",
+        application_url="https://boards.greenhouse.io/exampleco/jobs/1",
+    )
+    lever_job = _job(
+        source_type="lever",
+        source_job_id="abc",
+        application_url="https://boards.greenhouse.io/exampleco/jobs/1",
+    )
+    sync_source(db_session, source_type="greenhouse", jobs=[greenhouse_job])
+    sync_source(db_session, source_type="lever", jobs=[lever_job])
+
+    visible = list_discovered_job_records(db_session)
+    assert len(visible) == 1
+
+    everything = list_discovered_job_records(db_session, include_duplicates=True)
+    assert len(everything) == 2

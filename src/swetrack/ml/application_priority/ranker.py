@@ -3,15 +3,16 @@
 Pure functions only -- no database or business-logic imports here, mirroring
 ``ml/study_ranking/ranker.py``'s separation.
 
-CLAUDE.md's full component list is role fit, readiness, user preference,
-deadline urgency, company interest, location, and compensation. All six are
-implemented here (location folds into ``user_preference`` alongside role,
-matching ``opportunities.ranking.base.build_match_reasons``'s existing
-matched_roles/matched_locations pair). Each is backed by a real, collected
-data source -- ``JobRecord.compensation_min/max``/``application_deadline``
-and ``CandidateProfile.preferred_companies``/``minimum_compensation`` (added
-alongside this module) -- so nothing here is an invented number standing in
-for data that doesn't exist yet.
+CLAUDE.md's original component list is role fit, readiness, user
+preference, deadline urgency, company interest, location, and compensation.
+Job Radar Checkpoint 3 adds two more, real components rather than
+recomputing the earlier six differently: ``freshness`` (how recently a job
+was published/discovered -- 0 for a sample/CSV job never run through
+discovery) and ``new_grad_confidence`` (the deterministic eligibility
+classifier's confidence). ``PRIORITY_VERSION`` bumps whenever this weight
+set changes, so a stored/displayed score can always be traced to the
+formula that produced it (SWETrack_Job_Radar_Claude_Code_Handoff.md
+Checkpoint 3 acceptance: "Every score includes reasons and version").
 """
 
 from __future__ import annotations
@@ -20,27 +21,27 @@ import math
 
 from pydantic import BaseModel, ConfigDict, Field
 
-# Days until a deadline at which urgency has decayed to ~37% (1/e) of its
-# peak. A configured constant, not fit to any data -- see bkt.py's
-# DEFAULT_PARAMETERS docstring for the same "configured, not learned"
-# distinction.
 _DEFAULT_DEADLINE_HALF_LIFE_DAYS = 14.0
+
+PRIORITY_VERSION = "priority-v2"
 
 
 class ApplicationPriorityWeights(BaseModel):
-    """Configurable weights combining the six priority components into one score.
+    """Configurable weights combining the eight priority components into one score.
 
     Sums to 1.0 so the combined score stays in [0, 1].
     """
 
     model_config = ConfigDict(frozen=True)
 
-    role_fit: float = Field(ge=0.0, le=1.0, default=0.30)
-    readiness: float = Field(ge=0.0, le=1.0, default=0.30)
-    user_preference: float = Field(ge=0.0, le=1.0, default=0.15)
-    company_interest: float = Field(ge=0.0, le=1.0, default=0.10)
-    compensation_fit: float = Field(ge=0.0, le=1.0, default=0.10)
-    deadline_urgency: float = Field(ge=0.0, le=1.0, default=0.05)
+    role_fit: float = Field(ge=0.0, le=1.0, default=0.25)
+    readiness: float = Field(ge=0.0, le=1.0, default=0.20)
+    freshness: float = Field(ge=0.0, le=1.0, default=0.20)
+    new_grad_confidence: float = Field(ge=0.0, le=1.0, default=0.10)
+    user_preference: float = Field(ge=0.0, le=1.0, default=0.12)
+    company_interest: float = Field(ge=0.0, le=1.0, default=0.05)
+    compensation_fit: float = Field(ge=0.0, le=1.0, default=0.05)
+    deadline_urgency: float = Field(ge=0.0, le=1.0, default=0.03)
 
 
 DEFAULT_WEIGHTS = ApplicationPriorityWeights()
@@ -53,6 +54,8 @@ class ApplicationPriorityComponents(BaseModel):
 
     role_fit: float = Field(ge=0.0, le=1.0)
     readiness: float = Field(ge=0.0, le=1.0)
+    freshness: float = Field(ge=0.0, le=1.0)
+    new_grad_confidence: float = Field(ge=0.0, le=1.0)
     user_preference: float = Field(ge=0.0, le=1.0)
     company_interest: float = Field(ge=0.0, le=1.0)
     compensation_fit: float = Field(ge=0.0, le=1.0)
@@ -124,6 +127,8 @@ def score_application(
     raw = (
         weights.role_fit * components.role_fit
         + weights.readiness * components.readiness
+        + weights.freshness * components.freshness
+        + weights.new_grad_confidence * components.new_grad_confidence
         + weights.user_preference * components.user_preference
         + weights.company_interest * components.company_interest
         + weights.compensation_fit * components.compensation_fit
