@@ -127,6 +127,11 @@
 <div class="grid">
 
   <div class="card" style="grid-column: 1 / -1;">
+    <h2>Job Radar Inbox <button class="secondary refresh" onclick="loadInbox()">Refresh</button></h2>
+    <div id="inbox" class="empty">Loading…</div>
+  </div>
+
+  <div class="card" style="grid-column: 1 / -1;">
     <h2>Discover Jobs <button class="secondary refresh" onclick="loadDiscover()">Refresh</button></h2>
     <div id="discover" class="empty">Loading…</div>
   </div>
@@ -210,6 +215,96 @@ async function getJSON(path, opts) {
 
 function renderError(el, err) {
   el.innerHTML = `<div class="error">Couldn't load this — is the API running? (${esc(err.message)})</div>`;
+}
+
+const ELIGIBILITY_COLOR = { eligible: 'var(--good)', uncertain: 'var(--mid)', ineligible: 'var(--bad)' };
+
+function formatDateTime(iso) {
+  if (!iso) return 'unknown';
+  return new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+// --- Job Radar Inbox: GET /jobs/inbox ---
+// Distinguishes "Published" (source_published_at, when the source gives one)
+// from "First found" (first_seen_at) -- never conflated into a single date.
+async function loadInbox() {
+  const el = document.getElementById('inbox');
+  el.innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    const entries = await getJSON('/jobs/inbox');
+    if (!entries.length) {
+      el.innerHTML = '<div class="empty">No jobs discovered yet — run <code>python scripts/jobs_fetch.py --registry</code> ' +
+        '(or <code>jobs_sync_and_notify.py</code>) to bring some in.</div>';
+      return;
+    }
+    el.innerHTML = entries
+      .map((entry) => {
+        const elig = entry.eligibility;
+        const priorityPct = entry.priority ? fmtPct(entry.priority.score) : 'n/a';
+        const published = formatDateTime(entry.source_published_at);
+        const firstFound = formatDateTime(entry.first_seen_at);
+        return `<div class="row" style="flex-direction: column; align-items: stretch;">
+          <div class="row" style="border: none; padding: 0;">
+            <div>
+              <div class="job-title">
+                <a href="${esc(entry.application_url)}" target="_blank" rel="noopener">${esc(entry.title)}</a>
+                — ${esc(entry.company)}
+              </div>
+              <div class="job-sub">${esc(entry.location || 'Location n/a')} · ${esc(entry.source_type)}</div>
+              <div class="job-sub">Published: ${published} · First found: ${firstFound}</div>
+            </div>
+            <div style="text-align:right;">
+              <span class="status-badge" style="background:${ELIGIBILITY_COLOR[elig.status]}; color:#fff;">${esc(elig.status)}</span>
+              <div class="pct">${priorityPct}</div>
+            </div>
+          </div>
+          ${entry.priority ? bar(entry.priority.score) : ''}
+          <div style="margin-top: 8px; display: flex; gap: 8px;">
+            <button class="secondary" onclick="inboxAction('${entry.application_id}', 'interested', this)">Save</button>
+            <button class="secondary" onclick="inboxAction('${entry.application_id}', 'applied', this)">Mark Applied</button>
+            <button class="secondary" onclick="dismissInboxEntry('${entry.application_id}', this)">Dismiss</button>
+          </div>
+        </div>`;
+      })
+      .join('');
+  } catch (err) {
+    renderError(el, err);
+  }
+}
+
+async function inboxAction(applicationId, status, btn) {
+  if (!applicationId) { alert('This job has no tracked application yet.'); return; }
+  btn.disabled = true;
+  try {
+    await getJSON(`/applications/${applicationId}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    loadInbox();
+    loadPriority();
+  } catch (err) {
+    btn.disabled = false;
+    alert('Could not update this job: ' + err.message);
+  }
+}
+
+async function dismissInboxEntry(applicationId, btn) {
+  if (!applicationId) { alert('This job has no tracked application yet.'); return; }
+  const reason = prompt('Reason for dismissing (optional):', '') || '';
+  btn.disabled = true;
+  try {
+    await getJSON(`/applications/${applicationId}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'withdrawn', notes: reason }),
+    });
+    loadInbox();
+    loadPriority();
+  } catch (err) {
+    btn.disabled = false;
+    alert('Could not dismiss this job: ' + err.message);
+  }
 }
 
 // --- Discover Jobs: POST /recommend, with a Track button -> POST /applications ---
@@ -456,6 +551,7 @@ document.getElementById('interview-form').addEventListener('submit', async (even
   }
 });
 
+loadInbox();
 loadDiscover();
 loadPriority();
 loadReadinessSummary();

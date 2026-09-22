@@ -45,6 +45,8 @@ from swetrack.domains.applications.services import (
 from swetrack.domains.interviews.schemas import CreateInterviewRequest, Interview
 from swetrack.domains.interviews.schemas import RoundType as RoundTypeType
 from swetrack.domains.interviews.services import create_interview, get_interview, list_interviews
+from swetrack.domains.jobs.eligibility import EligibilityStatus as EligibilityStatusType
+from swetrack.domains.jobs.inbox import InboxEntry, list_inbox
 from swetrack.domains.jobs.services import list_discovered_job_records
 from swetrack.domains.learning.schemas import InterviewReadinessSummary, SkillMasterySummary, StudyRecommendation
 from swetrack.domains.learning.services import (
@@ -135,6 +137,38 @@ def get_jobs(
     if limit is None:
         return jobs[offset:]
     return jobs[offset : offset + limit]
+
+
+@app.get("/jobs/inbox", response_model=list[InboxEntry])
+def get_jobs_inbox(
+    eligibility_status: EligibilityStatusType | None = Query(default=None),
+    application_status: ApplicationStatusType | None = Query(default=None),
+    min_priority: float | None = Query(default=None, ge=0.0, le=1.0),
+    since_hours: float | None = Query(default=None, gt=0.0),
+    ranker: RankerName = Query(default="tfidf"),
+    session: Session = Depends(get_db_session),
+) -> list[InboxEntry]:
+    """Job Radar inbox: discovered jobs enriched with eligibility, discovery timing, and priority.
+
+    Registered before GET /jobs/{job_id}-shaped routes would be (none exist
+    yet) so "inbox" is never mistaken for a job_id. Every entry keeps
+    `source_published_at` ("published") separate from `first_seen_at`
+    ("first found") -- never conflated, per CLAUDE.md Section 8.
+    """
+    try:
+        profile = load_candidate_profile()
+    except DataLoadError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return list_inbox(
+        session,
+        ranker=_build_ranker(ranker),
+        profile=profile,
+        eligibility_status=eligibility_status,
+        application_status=application_status,
+        min_priority=min_priority,
+        since_hours=since_hours,
+    )
 
 
 @app.post("/recommend", response_model=RecommendResponse)

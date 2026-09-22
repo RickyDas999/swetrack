@@ -63,3 +63,7 @@ class DiscoveredJobRecord(Base):
     # not a merged multi-provenance record -- see services.py's
     # _find_cross_source_duplicate for the matching rules and rationale.
     duplicate_of_id: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    # Set once a local notification has actually been sent for this job
+    # (Job Radar Checkpoint 4) -- the dedup key that keeps a re-sync or a
+    # re-run of the notification check from alerting twice for one job.
+    notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
