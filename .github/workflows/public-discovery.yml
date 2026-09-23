@@ -1,0 +1,91 @@
+name: Public Job Discovery
+
+# SWETrack_Job_Radar_Claude_Code_Handoff.md Section 5 / Checkpoint 7:
+# "always-on discovery plane (optional after local MVP)." Runs only
+# public-data discovery + generic (non-personalized) new-grad
+# classification, and publishes a small public/latest_jobs.json feed --
+# never resume text, the named candidate profile, application history, or
+# any secret. See src/swetrack/domains/jobs/public_feed.py's own docstring
+# for the structural guarantee this relies on.
+#
+# The local app imports that feed privately (scripts/import_public_feed.py)
+# and does all personalized scoring (Role Fit, Readiness, Application
+# Priority, eligibility against the real candidate profile) there, not here.
+#
+# Billing/spending-limit safeguards:
+# - This repository is public, so GitHub Actions minutes are free and
+#   unlimited on GitHub's Free plan -- there is no billing risk from this
+#   workflow as configured. If this repository is ever made private,
+#   GitHub Free caps included minutes (2,000/month as of writing); set an
+#   explicit spending limit at https://github.com/settings/billing before
+#   that happens, since a private repo's Actions usage can otherwise incur
+#   charges.
+# - `timeout-minutes` bounds a single run regardless of billing plan.
+# - `concurrency` prevents overlapping runs from ever stacking up.
+#
+# ON BY DEFAULT: only `workflow_dispatch` (manual runs from the Actions
+# tab). The `schedule` trigger below is commented out -- this workflow
+# does not run unattended, and will not commit to this repository on its
+# own, until a human deliberately uncomments it and pushes that change.
+# Uncomment when you actually want always-on discovery independent of your
+# machine being awake:
+#
+# schedule:
+#   - cron: "0 */6 * * *"   # every 6 hours
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: public-discovery
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      # Mirrors ci.yml: install the CPU-only torch build first, since
+      # sentence-transformers otherwise pulls in the much larger default
+      # PyPI wheel with CUDA runtime deps this runner never uses.
+      - name: Install CPU-only torch
+        run: pip install --index-url https://download.pytorch.org/whl/cpu torch
+
+      - name: Install package
+        run: pip install -e .
+
+      - name: Refresh the public discovery feed
+        run: python scripts/public_discovery.py
+
+      # Defense in depth on top of public_feed.py's own internal check
+      # (which refuses to write a feed containing these markers at all):
+      # fail the whole workflow loudly if anything sensitive ever appears
+      # in the file this step is about to commit.
+      - name: Secret scan (fail closed on any private-data marker)
+        run: |
+          if grep -Eiq "master_resume|evidence\.yaml|swetrack\.db|candidate\.example\.yaml" public/latest_jobs.json; then
+            echo "::error::Forbidden content found in public/latest_jobs.json -- refusing to commit."
+            exit 1
+          fi
+
+      - name: Commit the feed if it changed
+        run: |
+          if git diff --quiet -- public/latest_jobs.json; then
+            echo "No changes to public/latest_jobs.json -- nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/latest_jobs.json
+          git commit -m "chore: refresh public job discovery feed"
+          git push

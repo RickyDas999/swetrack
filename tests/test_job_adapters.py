@@ -240,3 +240,14 @@ def test_strip_html_to_text_removes_tags_and_collapses_whitespace() -> None:
 
 def test_strip_html_to_text_handles_blank_input() -> None:
     assert strip_html_to_text("") == ""
+
+
+def test_strip_html_to_text_handles_html_entity_escaped_markup() -> None:
+    # Regression: Greenhouse's `content` field returns HTML that is itself
+    # HTML-entity-escaped once (confirmed against a real board) -- a naive
+    # single-pass parser leaves the escaped tags as literal "&lt;div&gt;"
+    # text instead of recognizing and stripping them.
+    escaped = "&lt;div&gt;&lt;p&gt;Hello &lt;strong&gt;World&lt;/strong&gt;&lt;/p&gt;&lt;/div&gt;"
+    result = strip_html_to_text(escaped)
+    assert result == "Hello World"
+    assert "<" not in result and "&lt;" not in result

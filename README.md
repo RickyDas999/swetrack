@@ -695,6 +695,42 @@ API key, no LLM API call, no browser automation. The app works identically with 
   complexity (timeout handling, untrusted-JD process isolation) for something this default
   copy/paste workflow already covers at zero risk.
 
+### Optional always-on public discovery (`domains/jobs/public_feed.py`)
+
+A GitHub Actions workflow (`.github/workflows/public-discovery.yml`) that discovers jobs
+independent of your machine being awake — structurally unable to leak private data, since it
+never imports `infrastructure.database` (no SQLite session, ever touches `var/swetrack.db`),
+never reads `resume/master_resume.tex`, and never reads the named `config/candidate.example.yaml`.
+
+- **`scripts/public_discovery.py`** fetches from the source registry, classifies eligibility with
+  a *generic* candidate (no name, current calendar year — just enough to filter out confidently
+  senior/intern postings and keep the feed small; the local pipeline re-classifies with your real
+  profile on import), merges with the existing `public/latest_jobs.json` (preserving each job's
+  original `first_seen_at`, confirmed against a real Greenhouse board across two runs a few
+  seconds apart), and applies retention (drops entries older than 14 days, caps total size,
+  drops cross-source duplicates). Refuses to even write the file if a forbidden marker
+  (`master_resume`, `evidence.yaml`, `swetrack.db`, `candidate.example.yaml`) is somehow present.
+- **`scripts/import_public_feed.py`** reads that feed and hands it to the exact same
+  `sync_source` path the ATS adapters use — idempotent for the same reason (confirmed: importing
+  the same real 51-job feed twice reported `new=0 updated=0 unchanged=51` on the second run), and
+  a new non-duplicate job still auto-creates a `"discovered"` application. This is where all
+  personalized scoring happens — nothing about it runs in the GitHub Actions workflow.
+- **On by default: nothing.** The workflow only has a `workflow_dispatch` (manual) trigger; its
+  `schedule` trigger is commented out in the file. It will not run unattended, and will not
+  commit to the repository on its own, until a human deliberately uncomments the schedule and
+  pushes that change. When it does run, `permissions: contents: write` is scoped to just this
+  workflow, `concurrency` prevents overlapping runs, `timeout-minutes: 10` bounds a single run,
+  and a secret-scan step re-checks the generated file before any commit as defense in depth on
+  top of the script's own internal check.
+- Billing: this repository is public, so GitHub Actions minutes are free and unlimited on
+  GitHub's Free plan — documented directly in the workflow file, along with what changes if the
+  repository is ever made private.
+- **A real, pre-existing bug found and fixed while building this**: `strip_html_to_text` (used by
+  every adapter since Checkpoint 1) didn't handle ATS platforms that return `content` as HTML
+  that's itself HTML-entity-escaped once (confirmed against a real GitLab Greenhouse board —
+  `&lt;div&gt;` instead of `<div>`), so tags leaked into every `description_plain` as literal
+  text. Fixed by unescaping to a fixed point before stripping tags; regression test added.
+
 ## Docker
 
 ```bash

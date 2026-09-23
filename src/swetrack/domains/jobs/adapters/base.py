@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html as html_lib
 from datetime import datetime
 from html.parser import HTMLParser
 from typing import Any, Protocol
@@ -78,16 +79,29 @@ class _TextExtractor(HTMLParser):
         return " ".join(" ".join(self._chunks).split())
 
 
-def strip_html_to_text(html: str) -> str:
+def strip_html_to_text(raw_html: str) -> str:
     """Plain text from an ATS description field.
 
     Job descriptions are untrusted external content
     (SWETrack_Job_Radar_Claude_Code_Handoff.md Section 16: "sanitize HTML to
     plain text. Never render source HTML unsafely."). This only ever
     extracts text nodes -- it never executes, evaluates, or re-renders markup.
+
+    Some ATS platforms (confirmed: Greenhouse's `content` field) return
+    this text already HTML-entity-escaped once on top of the real markup
+    (e.g. the literal characters ``&lt;div&gt;`` instead of ``<div>``).
+    Unescaping is repeated to a fixed point first so the real tags are
+    visible to the parser below -- otherwise they're left as literal
+    "&lt;"/"&gt;" text that never gets recognized as a tag, and the "plain
+    text" this function returns still contains a full HTML document.
     """
-    if not html:
+    if not raw_html:
         return ""
+    text = raw_html
+    previous = None
+    while previous != text:
+        previous = text
+        text = html_lib.unescape(text)
     parser = _TextExtractor()
-    parser.feed(html)
+    parser.feed(text)
     return parser.text()
