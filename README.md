@@ -669,6 +669,32 @@ CLI-only for now, no dashboard/API wiring yet beyond the inbox endpoint below.
   `cm-super`, etc. via `tlmgr` — BasicTeX ships without them) to actually compile a PDF; without
   one, everything through LaTeX source generation still works, just without the final PDF step.
 
+### Guarded subscription AI resume review (`domains/resume/ai_workbench.py`)
+
+A zero-cost, copy/paste review layer on top of the deterministic tailoring pipeline above — no
+API key, no LLM API call, no browser automation. The app works identically with or without it.
+
+- **`scripts/generate_resume_prompt_packet.py --job-id <id>`** writes a markdown prompt
+  containing the job's sanitized text (delimited and injection-neutralized — a JD trying to
+  break out of its own block, e.g. by including the literal delimiter tokens, gets redacted),
+  every enabled evidence item, the deterministic baseline ordering (for reference, not a
+  requirement), and a strict response-format instruction. Paste it into an existing Claude or
+  ChatGPT subscription.
+- The AI's only allowed action is to **select and order existing evidence ids** — it cannot write
+  new text, invent a skill/metric, or edit anything. That constraint is what makes validation
+  simple and trustworthy: **`scripts/apply_ai_resume_review.py`** parses the pasted-back JSON and
+  runs it through the *exact same truth gate* (`truth_gate.validate_selection`) a deterministic
+  pass uses — an unknown, disabled, or unverified evidence id is rejected with a specific reason
+  (verified in this repo: a fabricated `"fabricated-kubernetes-experience"` id and an attempt to
+  sneak in one of the disabled SWETrack bullets were both cleanly rejected, exit code 1, no
+  resume produced). An accepted response renders and compiles a real tailored PDF exactly like
+  the deterministic path, plus a diff (`kept`/`reordered`/`excluded` per evidence id) against the
+  full base resume.
+- Does **not** implement the handoff's optional "Claude Code CLI adapter" (subprocess-invoked,
+  off by default) — the handoff itself frames it as optional and after-MVP, and it adds real
+  complexity (timeout handling, untrusted-JD process isolation) for something this default
+  copy/paste workflow already covers at zero risk.
+
 ## Docker
 
 ```bash
