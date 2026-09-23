@@ -2,6 +2,13 @@
 
 Use this as a study guide after the system works. Do not memorize wording without tracing it to the code.
 
+**Scope note:** this only covers the original TF-IDF/embedding Opportunity
+Intelligence ranker (Milestone 1). It does not yet cover the skill
+taxonomy, BKT mastery, Application Priority, or Job Radar (ingestion,
+eligibility, the job inbox, or resume tailoring) — all real, substantial
+parts of the system now. Treat this as a study guide for one subsystem, not
+the whole project, until it's extended.
+
 ## Thirty-second explanation
 
 SWETrack's Opportunity Intelligence subsystem (originally built as RoleRank) is a content-based recommendation service that ranks new-grad software-engineering jobs against a candidate profile. I built a TF-IDF baseline and a sentence-embedding ranker, compared them with Precision@K and NDCG@K on explicit relevance judgments, tracked experiments locally with MLflow, and served recommendations through a tested, containerized FastAPI API.

@@ -4,12 +4,13 @@ SWETrack is a personalized ML platform for new-grad SWE recruiting and interview
 preparation, combining semantic job-role ranking with skill modeling across coding and
 System Design to generate role-specific readiness gaps and prioritized study
 recommendations. It started as **RoleRank** (a standalone job-ranking tool) and has since
-grown into four connected product areas, all implemented in this repository, $0 to run,
+grown into five connected product areas, all implemented in this repository, $0 to run,
 fully local:
 
 - **Opportunity Intelligence** — ranks jobs against a candidate profile (`domains/opportunities/`),
   tracks a recruiting pipeline per job (`domains/applications/`), and combines Fit + Readiness +
-  preference/compensation/deadline signals into one explainable Application Priority score.
+  freshness + eligibility + preference/compensation/deadline signals into one explainable
+  Application Priority score.
 - **Interview Tracking** — logs interview rounds and feeds decided outcomes back into skill
   mastery (`domains/interviews/`).
 - **Skill Intelligence** — a canonical software-engineering skill taxonomy with deterministic
@@ -17,6 +18,10 @@ fully local:
   `SkillEvent` history to estimate per-skill mastery (`domains/learning/`, `ml/knowledge_tracing/`).
 - **Adaptive Preparation** — an explainable heuristic ranker recommending what to study next from
   mastery gaps, staleness, difficulty fit, and repetition (`ml/study_ranking/`).
+- **Job Radar** — polls public ATS boards (Greenhouse/Lever/Ashby) and manual imports for new
+  postings, deduplicates them, classifies new-grad eligibility, scores freshness, surfaces a job
+  inbox with local notifications, and generates truth-gated, evidence-backed one-page tailored
+  resumes (`domains/jobs/`, `domains/resume/`). See [Job Radar](#job-radar) below.
 
 Not a deployed product and not a system that has learned from real user behavior — every ML
 component here is either an unsupervised/deterministic baseline or a configured (not fit/learned)
@@ -76,19 +81,46 @@ swetrack/
 │   │   │   └── priority.py              # Fit + Readiness + preference/comp/deadline
 │   │   ├── interviews/                  # interview rounds, feeding decided outcomes to mastery
 │   │   ├── skills/                      # canonical taxonomy + deterministic alias normalization
-│   │   └── learning/                    # activities, immutable attempts/SkillEvents, mastery cache
+│   │   ├── learning/                    # activities, immutable attempts/SkillEvents, mastery cache
+│   │   ├── jobs/                        # Job Radar: ingestion, persistence, eligibility, inbox
+│   │   │   ├── adapters/                # greenhouse.py / lever.py / ashby.py / manual.py
+│   │   │   ├── models.py                # DiscoveredJobRecord (discovered_jobs table)
+│   │   │   ├── services.py              # sync_source: idempotent upsert + cross-source dedup
+│   │   │   ├── eligibility.py           # deterministic new-grad classifier
+│   │   │   ├── freshness.py             # 0-1 decay score from published/first-seen time
+│   │   │   ├── notifications.py         # dedup + threshold + quiet hours -> macOS notification
+│   │   │   ├── registry.py              # source registry YAML loading + adapter construction
+│   │   │   └── inbox.py                 # enriched, filterable job inbox
+│   │   └── resume/                      # Job Radar: evidence library + tailoring
+│   │       ├── parser.py                # LaTeX resume -> draft evidence items
+│   │       ├── evidence.py              # evidence.yaml loading + validation
+│   │       ├── tailoring.py             # skill-match scoring, selection, gaps, ATS coverage, diff
+│   │       ├── truth_gate.py            # rejects any unverified/disabled/unknown evidence
+│   │       └── latex.py                 # renders + compiles a one-page tailored PDF
 │   ├── ml/
 │   │   ├── knowledge_tracing/bkt.py     # Bayesian Knowledge Tracing (pure functions)
 │   │   ├── study_ranking/ranker.py      # Adaptive Preparation heuristic ranker
 │   │   ├── application_priority/ranker.py  # Application Priority heuristic ranker
-│   │   └── evaluation/                  # BKT vs. historical-success-rate baseline
-│   └── infrastructure/
-│       ├── database/                    # SQLAlchemy engine/session, SQLite by default
-│       └── paths.py                     # repo-root resolution
+│   │   └── evaluation/                  # BKT and eligibility-classifier baselines
+│   ├── infrastructure/
+│   │   ├── database/                    # SQLAlchemy engine/session, SQLite by default
+│   │   ├── notifications/macos.py       # osascript-based local notifications
+│   │   └── paths.py                     # repo-root resolution
+│   └── static/dashboard.html            # dashboard UI, incl. the Job Radar inbox panel
+├── resume/
+│   ├── evidence.yaml                    # tracked: structured resume facts, no contact info
+│   ├── master_resume.tex                # gitignored: real resume, has personal contact info
+│   └── variants/                        # gitignored: generated tailored .tex/.pdf per job
 ├── scripts/
 │   ├── recommend.py                          # CLI: rank sample jobs, print top K
 │   ├── run_experiment.py                     # run both rankers, log to MLflow
-│   └── run_knowledge_tracing_experiment.py   # BKT vs. baseline on a synthetic learner
+│   ├── run_knowledge_tracing_experiment.py   # BKT vs. baseline on a synthetic learner
+│   ├── run_eligibility_evaluation.py         # eligibility classifier vs. a labeled fixture
+│   ├── jobs_fetch.py                         # dry-run or persist a sync from one/all sources
+│   ├── jobs_sync_and_notify.py               # sync + notify; what the LaunchAgent runs
+│   ├── install_launch_agent.py / uninstall_launch_agent.py
+│   ├── parse_resume_to_evidence.py           # bootstrap/refresh the evidence library
+│   └── tailor_resume.py                      # generate a truth-gated tailored resume PDF
 ├── tests/                               # pytest: one file per domain/ML module + API
 ├── Dockerfile / .dockerignore
 └── mlruns/                              # generated locally by run_experiment.py; gitignored
@@ -163,13 +195,18 @@ domain's own section further below:
 
 | Domain | Endpoints |
 |---|---|
-| Core | `GET /health`, `GET /jobs`, `POST /recommend` |
+| Core | `GET /health`, `GET /jobs`, `POST /recommend` (both now include Job Radar discovered jobs) |
+| Job Radar inbox | `GET /jobs/inbox` |
 | Readiness | `GET /opportunities/{job_id}/readiness` |
 | Applications | `POST /applications`, `GET /applications`, `GET /applications/{id}`, `POST /applications/{id}/status`, `GET /applications/{id}/history` |
 | Application Priority | `GET /applications/{id}/priority`, `GET /applications/priority` |
 | Interviews | `POST /interviews`, `GET /interviews`, `GET /interviews/{id}` |
 | Skill mastery | `GET /mastery`, `GET /mastery/summary`, `GET /recommendations` |
 | Dashboard | `GET /` (HTML, not JSON — see Milestone 15 below) |
+
+Job discovery/sync, resume evidence, and resume tailoring are CLI-only for now
+(`scripts/jobs_fetch.py`, `scripts/jobs_sync_and_notify.py`, `scripts/tailor_resume.py`) —
+see [Job Radar](#job-radar).
 
 - `GET /health` — service status and version. Never loads the sentence-embedding model.
 - `GET /jobs` — sample job metadata, with optional `?limit=&offset=` pagination.
@@ -534,6 +571,104 @@ failing silently. No build tooling, no npm, no CDN dependency — plain HTML/CSS
 file, consistent with CLAUDE.md's cost stance and its explicit caution against a "complex
 frontend redesign."
 
+## Job Radar
+
+Job Radar extends Opportunity Intelligence from "rank a supplied set of jobs" to "find new
+postings yourself, decide if they're worth acting on, and prepare a truthful resume for the
+best ones" — still $0, still fully local. Built across its own five checkpoints
+(`docs/job-radar-integration-plan.md` has the full Checkpoint 0 audit and decision record);
+CLI-only for now, no dashboard/API wiring yet beyond the inbox endpoint below.
+
+### Discovery and persistence (`domains/jobs/`)
+
+- **Adapters** (`adapters/greenhouse.py`, `lever.py`, `ashby.py`, `manual.py`) fetch from each
+  ATS's public, unauthenticated JSON API (or take a pasted URL/JD for `manual`) and normalize
+  every source into one `NormalizedJob` shape. A shared `http_get_json`/`parse_iso_timestamp`
+  helper in `adapters/base.py` avoids repeating HTTP/timestamp-parsing logic per adapter.
+- **`config/sources.example.yaml`** + `registry.py` validate which boards to poll and construct
+  the matching adapter; a company's identifier field (`token`/`site`/`board_name`) is enforced to
+  match its declared `adapter`.
+- **`services.py::sync_source`** is the only write path to the `discovered_jobs` table:
+  idempotent upsert keyed by `{source_type}:{source_job_id}` (re-syncing the same job never
+  duplicates it), revision detection (a changed description updates the existing row and bumps
+  `last_seen_at` without touching `first_seen_at`), and cross-source duplicate detection (same
+  normalized company+title+location *and* either a matching URL or near-identical description —
+  flagged via `duplicate_of_id`, not merged into one row). A new, non-duplicate job immediately
+  auto-creates a `"discovered"`-status `ApplicationRecord`, so it flows through the *existing*
+  Application Priority pipeline unchanged rather than needing a second scoring path.
+- **`to_job_record`/`list_discovered_job_records`** convert persisted discovered jobs into the
+  same `JobRecord` shape the CSV sample jobs use, so `GET /jobs`, `POST /recommend`,
+  `GET /opportunities/{id}/readiness`, and both priority endpoints see real discovered jobs
+  automatically, with no ranking-code changes. `JobRecord.source` gained a `"discovered"` value
+  (alongside `sample`/`synthetic`) so provenance stays honest.
+- `scripts/jobs_fetch.py --registry` (or `--source greenhouse --token ... --company ...`) —
+  `--dry-run` prints normalized jobs with no DB writes; without it, syncs for real.
+
+### Eligibility, freshness, and priority (`domains/jobs/eligibility.py`, `freshness.py`)
+
+- A **deterministic new-grad eligibility classifier** — `eligible`/`uncertain`/`ineligible` with
+  confidence, matched phrases, and reasons, never an LLM call. Evaluated against a 30-example
+  reviewed, hand-labeled fixture (`data/eligibility_labels.csv`) via
+  `scripts/run_eligibility_evaluation.py`: **93% accuracy** (28/30), with both misses honestly
+  reported (a wide experience range like "1-10 years" or a range next to a "senior scope" mention
+  fools the regex's naive number extraction — a documented limitation, not hidden).
+- **Freshness** — the handoff's 0-2h/2-6h/.../7-day decay table, `[0,1]`-scaled, from
+  `source_published_at` (preferred) or `first_seen_at` ("first found").
+- **Application Priority grew two real components** (`priority-v2`): `freshness` and
+  `new_grad_confidence` (the eligibility confidence, inverted for a confidently-*ineligible* job
+  so a clearly senior/intern posting scores low here, not high). Weights were rebalanced across
+  all eight components, still summing to 1.0. `evidence_coverage` from the original handoff
+  formula is deliberately *not* added — there's no resume evidence library consumer for it at the
+  application-priority layer yet.
+
+### Job inbox and notifications (`domains/jobs/inbox.py`, `notifications.py`)
+
+- **`GET /jobs/inbox`** — every non-duplicate discovered job enriched with eligibility, priority,
+  and application status, filterable by `eligibility_status`, `application_status`,
+  `min_priority`, `since_hours`. Every entry keeps `source_published_at` ("published") and
+  `first_seen_at` ("first found") as two separate fields, never conflated. Dashboard panel:
+  **Job Radar Inbox**, with Save/Mark Applied/Dismiss buttons that just call the existing
+  `POST /applications/{id}/status` (dismiss reuses the `"withdrawn"` status with an optional
+  reason) — no new status values or endpoints needed.
+- **macOS notifications** (`infrastructure/notifications/macos.py`) via `osascript` — no
+  dependency, no-op (never raises) off-macOS. `notify_new_discoveries` dedups via a
+  `DiscoveredJobRecord.notified_at` timestamp set only on an actually-sent notification, so a
+  re-run never re-notifies; a configurable priority threshold and quiet-hours window
+  (`QuietHours`, wraps past midnight) suppress the rest.
+- `scripts/jobs_sync_and_notify.py` is the one command a LaunchAgent runs periodically (uses
+  `TfidfRanker`, never triggering an embedding-model download in the background);
+  `scripts/install_launch_agent.py` / `uninstall_launch_agent.py` manage a per-user
+  `~/Library/LaunchAgents` plist (no root required).
+
+### Resume evidence and tailoring (`domains/resume/`)
+
+- **`resume/evidence.yaml`** (tracked) holds structured resume facts — no personal contact
+  info — parsed automatically from a real `resume/master_resume.tex` (gitignored: it has a phone
+  number and email) by a purpose-built LaTeX parser (`parser.py`) that correctly handles this
+  template's nested formatting (e.g. `\textit{Role \textbf{--} More role}`) via a proper
+  balanced-brace matcher, not a naive regex. `scripts/parse_resume_to_evidence.py` (re)generates
+  the draft for review; nothing is trusted blindly — every item defaults to `verified: true` but
+  can be flagged `verified: false` / `enabled: false` with a `review_note` when a claim no longer
+  matches reality.
+- **Deterministic tailoring** (`tailoring.py`) — case-insensitive skill-overlap scoring reorders
+  bullets *within* each employer/project block by relevance to one job (never reordering
+  employers themselves), and produces a gaps report (job-required skills with no supporting
+  evidence — never added to the resume) and an ATS coverage report (covered vs. unsupported
+  keywords, never an "ATS pass probability").
+- **Truth gate** (`truth_gate.py`) rejects any selection referencing an unknown, disabled, or
+  unverified evidence item. Every included bullet renders as its evidence item's text verbatim —
+  no keyword substitution or wording variants — so no metric, date, or employer can ever change
+  from what's in `evidence.yaml`.
+- **LaTeX rendering + PDF compilation** (`latex.py`) copies the header/Education/Technical Skills
+  sections verbatim from the original template and only rebuilds Experience/Projects bullets from
+  selected evidence (plain text, no bold reconstruction, so nothing can drift from the
+  truth-gate-verified text); compiles via `pdflatex` and validates page count/text extraction with
+  `pypdf`. `scripts/tailor_resume.py --job-id <id>` runs the full pipeline end-to-end for any
+  sample or discovered job.
+- Requires a local LaTeX distribution (e.g. BasicTeX via Homebrew, plus `enumitem`, `titlesec`,
+  `cm-super`, etc. via `tlmgr` — BasicTeX ships without them) to actually compile a PDF; without
+  one, everything through LaTeX source generation still works, just without the final PDF step.
+
 ## Docker
 
 ```bash
@@ -579,6 +714,10 @@ store. No paid APIs, API keys, or provisioned cloud resources anywhere in the co
 (`.github/workflows/ci.yml`) runs on GitHub's free Actions minutes -- checkout, install, `pytest`,
 nothing more.
 
+Job Radar keeps the same stance: every ATS adapter hits a public, unauthenticated endpoint;
+`pypdf` is a free, pure-Python dependency; and PDF compilation uses a free local LaTeX
+distribution (BasicTeX via Homebrew) rather than any hosted rendering service.
+
 ## Limitations
 
 Opportunity Intelligence ranking specifically:
@@ -612,6 +751,22 @@ Across the platform:
 - `data/sample_jobs.csv`'s `application_deadline` values are static demo dates that will all
   eventually read as "passed" as real time moves past them.
 
+Job Radar specifically:
+
+- No skill extraction from a discovered job's free-text description yet — `to_job_record` sets
+  `skills=[]`, so Role Fit still works (it scores free text too), but Readiness for a discovered
+  job is currently a placeholder `1.0` ("nothing to be unprepared for"), and gaps/ATS coverage are
+  trivially empty for those jobs. Honest, not fabricated, but a real gap.
+- No soft-closure detection — a job that disappears from its source isn't marked `closed_at`.
+- No HTTP retry/backoff or per-source circuit breaker on ingestion failures yet.
+- No per-company notification cooldown or digesting of lower-confidence jobs.
+- Resume tailoring has no API/dashboard wiring yet (CLI-only), no keyword substitution/wording
+  variants (bullets render verbatim), no bold-emphasis reconstruction in rendered bullets, and
+  bullets are reordered but never dropped for space — true page-length-constrained selection needs
+  a compile-and-measure feedback loop.
+- The Docker image does not install a LaTeX distribution, so resume PDF compilation is not
+  available inside the container today (LaTeX source generation and the truth gate still are).
+
 ## Future work
 
 Recorded here rather than half-built:
@@ -630,3 +785,6 @@ Recorded here rather than half-built:
   carry a real weighting signal.
 - Drift and service monitoring.
 - Cloud deployment, only if a genuinely free and safe option is deliberately selected.
+- Job Radar Checkpoint 6 (guarded subscription AI workbench), Checkpoint 7 (optional
+  privacy-safe GitHub Actions discovery), and Checkpoint 8 (outcome analytics and hardening) —
+  see `SWETrack_Job_Radar_Claude_Code_Handoff.md`.

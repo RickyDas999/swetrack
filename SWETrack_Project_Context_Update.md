@@ -30,29 +30,21 @@ Job Radar is a module within SWETrack, not a separate product.
 
 ## 2. Current known implementation state
 
-The latest known project record reports:
+**Updated after Job Radar Checkpoints 0–5 (verified against the repository
+and a live `pytest` run; see `docs/job-radar-integration-plan.md` for the
+full Checkpoint 0 audit).** Everything from the original SWETrack
+milestones plus all of Job Radar's MVP (Checkpoints 0–5) is implemented:
 
-- Python 3.11 modular monolith.
-- FastAPI backend.
-- SQLAlchemy with local SQLite.
-- TF-IDF role ranker using cosine similarity.
-- Sentence Transformer role ranker using `all-MiniLM-L6-v2` with normalized embeddings and dot-product/cosine-equivalent scoring.
-- Lazy, process-level embedding-model loading.
-- Precision@K and NDCG@K evaluation.
-- Local MLflow experiment tracking.
-- Job and profile schemas plus preprocessing.
-- CLI recommendation/experiment workflows.
-- FastAPI endpoints including `/health`, `/jobs`, and `/recommend`.
-- Docker, pytest, deterministic behavior, and local-only operation.
-- Canonical skill taxonomy and aliases.
-- Immutable skill events.
-- Coding and System Design attempt tracking.
-- Bayesian Knowledge Tracing mastery estimates.
-- Explainable heuristic study recommendations.
-- Separate Role Fit and Role Readiness outputs.
-- Latest project record: 130 passing tests and milestones M0–M11 complete in a 14-milestone plan.
+- Python 3.11 modular monolith; FastAPI backend; SQLAlchemy with local SQLite (no React — a single static, dependency-free HTML dashboard).
+- TF-IDF role ranker and a Sentence Transformer (`all-MiniLM-L6-v2`) ranker, lazily loaded, both used for Role Fit.
+- Precision@K / NDCG@K evaluation and local MLflow experiment tracking.
+- Canonical skill taxonomy, deterministic alias normalization, immutable skill events, coding/System Design attempt tracking, Bayesian Knowledge Tracing mastery, explainable study recommendations.
+- Separate Role Fit, Readiness, and Application Priority outputs (never conflated).
+- Application pipeline and interview tracking, feeding decided outcomes back into mastery.
+- **Job Radar (Checkpoints 0–5, all complete):** Greenhouse/Lever/Ashby/manual ingestion adapters; a validated source registry; persisted, deduplicated `discovered_jobs` (idempotent upsert, cross-source duplicate detection); a deterministic new-grad eligibility classifier with a 30-example labeled evaluation set; freshness decay scoring; discovered jobs feeding the existing Role Fit/Readiness/Priority pipeline unchanged; a job inbox API + dashboard panel distinguishing published-vs-first-found time; deduplicated macOS notifications with quiet hours and a priority threshold; a LaunchAgent for periodic sync; a resume evidence library parsed from a real resume with a truth gate, deterministic tailoring, and real one-page PDF generation (LaTeX/pdflatex).
+- 304 passing tests as of this update.
 
-This is context, not permission to assume the repository still matches it. Claude Code must audit the actual repository before adding Job Radar. The repository and current tests are authoritative.
+This is context, not permission to assume the repository still matches it — the repository and current tests remain authoritative. Anything past this update (Checkpoint 6 onward) should be reverified the same way, not assumed from this bullet list.
 
 ## 3. Important model interpretation
 
@@ -256,11 +248,16 @@ When helping with SWETrack:
 
 ## 11. Immediate next action
 
-Begin only Job Radar Checkpoint 0.
+**Superseded.** Job Radar Checkpoints 0–5 (the full MVP: repository audit,
+ingestion, persistence/dedup, eligibility/priority, inbox/notifications,
+and resume tailoring) are complete — see `docs/job-radar-integration-plan.md`
+for the Checkpoint 0 audit this section originally asked for, and the
+repository/git history for everything built since.
 
-Claude Code should audit the actual repository and create `docs/job-radar-integration-plan.md`. This checkpoint makes no production-code changes. The plan must map the handoff to real modules, confirm the current milestone/test state, identify reusable ranking/readiness components, plan schema changes, and define the smallest Checkpoint 1 vertical slice.
-
-Use the exact starter prompt in Section 21 of `SWETrack_Job_Radar_Claude_Code_Handoff.md`.
+The next actual next action is **Job Radar Checkpoint 6 — subscription AI
+workbench** (`SWETrack_Job_Radar_Claude_Code_Handoff.md` Section 18), unless
+the user directs otherwise. As always, audit the real repository state
+before starting rather than assuming this file is current.
 
 ## 12. Files to keep together
 

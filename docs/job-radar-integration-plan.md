@@ -8,6 +8,16 @@ are called out explicitly in Section 13.
 
 No production code was changed to produce this document.
 
+> **Status as of Checkpoint 5 (later update):** everything this document
+> planned for Checkpoints 1–5 has since been built — ingestion adapters,
+> `discovered_jobs` persistence/dedup, eligibility/freshness/priority, the
+> job inbox and notifications, and resume evidence/tailoring. This document
+> is preserved as the original planning and decision record (including the
+> resolved open questions in Section 9 — `discovered_jobs` naming, the
+> auto-create-application design, and the separate candidate eligibility
+> config), not as a description of current unstarted work. See `README.md`
+> and `git log` for current state.
+
 ---
 
 ## 1. Current repository architecture and verified implementation state

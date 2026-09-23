@@ -1,5 +1,33 @@
 # AGENTS.md — RoleRank → SWETrack Migration
 
+## Current Status (read this first)
+
+**The migration this document describes is complete.** RoleRank → SWETrack
+(Phases 0–14 below, delivered as this repo's own Milestones 1–15) shipped
+long ago. Job Radar (a further extension covering job discovery/ingestion,
+eligibility, priority, an inbox, notifications, and resume tailoring —
+`SWETrack_Job_Radar_Claude_Code_Handoff.md`) has also completed Checkpoints
+0–5 of its own plan.
+
+Everything below this point — including "PHASE 0 — DISCOVERY BEFORE
+CHANGING CODE" and "FIRST ACTION" — is the **original migration plan**,
+kept for its still-relevant standing philosophy (cost constraints,
+incremental-milestone workflow, "do not overbuild," interview-readiness
+framing, the canonical skill taxonomy design, etc.), not as a next step.
+**Do not treat "FIRST ACTION" as the next action.** For the actual current
+state of the repository, read:
+
+- `README.md` — verified, current architecture and every shipped feature
+- `docs/job-radar-integration-plan.md` — Job Radar's audited integration
+  plan and decision record (Checkpoint 0), with the checkpoints since built
+  on top of it
+- `git log` — the real, current commit history
+
+The **incremental-milestone workflow, cost constraints, "do not overbuild,"
+and never-commit-without-asking rules below still apply to all future
+work** (including Job Radar Checkpoints 6+ and anything beyond it) — only
+the specific Phase/Milestone checklist is historical.
+
 ## Project Context
 
 This repository currently contains **RoleRank**, an ML-powered job matching and ranking system for new-grad SWE recruiting.
