@@ -43,6 +43,26 @@ def get_sessionmaker(engine: Engine) -> sessionmaker[Session]:
     return sessionmaker(bind=engine, expire_on_commit=False)
 
 
+def register_all_domain_models() -> None:
+    """Import every domain's ORM models module so Base.metadata is fully populated.
+
+    SQLAlchemy only registers a table when its model *class* is actually
+    imported somewhere in the process -- these imports exist purely for
+    that side effect (class-body execution registers each table on
+    ``Base.metadata``), not for any name they bind. A process that reaches
+    the database only through api.py (which transitively imports every
+    domain) never needs this explicitly; a standalone script that imports
+    only ``infrastructure.database.*`` does, or ``init_db()``/table
+    reflection silently sees zero tables. See scripts/export_data.py and
+    scripts/import_data.py, and tests/conftest.py's equivalent explicit
+    imports.
+    """
+    import swetrack.domains.applications.models  # noqa: F401
+    import swetrack.domains.interviews.models  # noqa: F401
+    import swetrack.domains.jobs.models  # noqa: F401
+    import swetrack.domains.learning.models  # noqa: F401
+
+
 def init_db(engine: Engine) -> None:
     """Create all tables from every imported model. Idempotent."""
     Base.metadata.create_all(engine)

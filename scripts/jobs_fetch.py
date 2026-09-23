@@ -35,6 +35,7 @@ from swetrack.domains.jobs.adapters.base import SourceAdapter
 from swetrack.domains.jobs.adapters.greenhouse import GreenhouseAdapter
 from swetrack.domains.jobs.adapters.lever import LeverAdapter
 from swetrack.domains.jobs.adapters.manual import ManualAdapter
+from swetrack.domains.jobs.orchestration import sync_registry_sources
 from swetrack.domains.jobs.registry import DEFAULT_SOURCES_PATH, build_adapter, load_source_registry
 from swetrack.domains.jobs.schemas import NormalizedJob, SyncResult
 from swetrack.domains.jobs.services import sync_source
@@ -128,10 +129,12 @@ def main(argv: list[str] | None = None) -> int:
 
         session = _open_session()
         try:
-            for entry in enabled:
-                jobs = build_adapter(entry).fetch()
-                result = sync_source(session, source_type=entry.adapter, jobs=jobs)
-                _print_sync_result(result, entry.company)
+            outcomes = sync_registry_sources(session, enabled)
+            for outcome in outcomes:
+                if outcome.error is not None:
+                    print(f"{outcome.entry.company}: FAILED -- {outcome.error}")
+                else:
+                    _print_sync_result(outcome.result, outcome.entry.company)
         finally:
             session.close()
         return 0

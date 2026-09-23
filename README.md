@@ -731,6 +731,43 @@ never reads `resume/master_resume.tex`, and never reads the named `config/candid
   `&lt;div&gt;` instead of `<div>`), so tags leaked into every `description_plain` as literal
   text. Fixed by unescaping to a fixed point before stripping tags; regression test added.
 
+### Outcome analytics and hardening (`domains/applications/analytics.py`, `domains/jobs/source_health.py`)
+
+- **`GET /analytics/funnel`** — funnel counts (how many tracked applications ever *reached* each
+  status, not just their current one — an application that went discovered → applied → rejected
+  still counts as having reached "applied"), time-to-apply (median/mean hours from creation to
+  first "applied," `None` with `sample_size: 0` rather than a fabricated number when there's no
+  data yet), per-source yield (discovered → applied → interviewed → offer, by `source_type`), and
+  response rate. Every response carries a `caveat` field: descriptive statistics over your own
+  history only, never causal, never a benchmark against other candidates.
+- **`GET /jobs/sources/health`** — last polled/success time, last error, and consecutive-failure
+  count per registry source. This is the `job_sources` sync-metadata table explicitly deferred
+  back in Checkpoint 2's integration plan ("add when it has a real consumer") — this is that
+  consumer.
+- **A real, pre-existing reliability bug found and fixed while building this**: neither
+  `scripts/jobs_fetch.py`'s registry mode nor `scripts/jobs_sync_and_notify.py` caught a
+  per-source fetch failure — one flaky ATS board raised out of the loop and aborted the *entire*
+  sync run, including sources that would otherwise have succeeded (and, in
+  `jobs_sync_and_notify.py`'s case, skipped notifications entirely). Consolidated both into one
+  tested function (`domains/jobs/orchestration.py::sync_registry_sources`) where a failing source
+  is recorded and skipped, never fatal.
+- **`scripts/export_data.py` / `scripts/import_data.py`** — a whole-database JSON backup covering
+  every table across every domain via generic SQLAlchemy table reflection, not a hand-maintained
+  per-domain list — a new domain's tables are backed up automatically. Verified with a genuine
+  cross-database round trip (export from one SQLite file, import into a completely separate
+  fresh one) preserving application status history, interview records, and discovered jobs.
+- **Another real bug found and fixed while building this**: both new backup scripts (and the
+  `db_session` test fixture, before this) only imported `infrastructure.database.*` directly —
+  never the domain model modules — so `Base.metadata` had zero tables registered when they ran
+  standalone (unlike `api.py`, which pulls in every domain transitively through its own imports).
+  Fixed with one shared `register_all_domain_models()` helper, now used by both scripts and by
+  `tests/conftest.py` (replacing four separate `# noqa: F401` imports there).
+- **`tests/test_end_to_end_journey.py`** — one test exercising a full realistic journey through
+  the real API: discover a job → see it in the inbox with real eligibility/priority → track it →
+  interview → outcome analytics and source health reflect it → a tailored resume can be generated
+  → a full backup/restore preserves the entire history. Every other test file exercises one
+  module in isolation; this is the one proving they compose correctly together.
+
 ## Docker
 
 ```bash
@@ -766,6 +803,54 @@ docker run --rm -p 8000:8000 -v swetrack-hf-cache:/root/.cache/huggingface swetr
 > `site-packages` instead of the copied `src/` tree). Re-run this check after any change to
 > `Dockerfile`, `pyproject.toml`, or `infrastructure/database/`, since none of those are
 > covered by `pytest`.
+
+## Operating guide
+
+The commands above are scattered across each feature's own section; this is the condensed,
+day-to-day sequence for actually using Job Radar once it's set up (macOS; verified end-to-end
+against this README, per Checkpoint 8's acceptance criterion).
+
+```bash
+# One-time setup
+python -m venv .venv && source .venv/bin/activate
+python -m pip install -e ".[dev]"
+python -m pytest -q                                  # 355 passing as of this checkpoint
+
+# One-time, if you want real ATS discovery: edit config/sources.example.yaml (or
+# copy it to config/sources.yaml) with real company board tokens, and put your
+# real resume at resume/master_resume.tex (gitignored -- it has your contact info).
+
+# Day to day
+python scripts/jobs_fetch.py --registry                       # sync configured ATS sources
+python scripts/jobs_sync_and_notify.py                        # sync + macOS notifications
+uvicorn swetrack.api:app --host 127.0.0.1 --port 8000          # then open http://127.0.0.1:8000/
+curl http://127.0.0.1:8000/jobs/inbox                          # or use the dashboard's inbox panel
+curl http://127.0.0.1:8000/jobs/sources/health                 # check sync reliability per source
+curl http://127.0.0.1:8000/analytics/funnel                    # funnel, time-to-apply, response rate
+
+# Once you've reviewed a job in the inbox and want to apply
+python scripts/parse_resume_to_evidence.py                     # (re)generate resume/evidence.yaml -- review it
+python scripts/tailor_resume.py --job-id <job_id>               # truth-gated, one-page tailored PDF
+# optional: get a second opinion from your own Claude/ChatGPT subscription first
+python scripts/generate_resume_prompt_packet.py --job-id <job_id>
+python scripts/apply_ai_resume_review.py --job-id <job_id> --response <pasted-response.json>
+
+# Log outcomes as they happen
+curl -X POST http://127.0.0.1:8000/applications/<id>/status -d '{"status": "applied"}'
+curl -X POST http://127.0.0.1:8000/interviews -d '{...}'
+
+# Backups (do this periodically -- it's your only copy of your recruiting history)
+python scripts/export_data.py                                  # writes var/backups/swetrack-export-*.json
+
+# Optional: install a LaunchAgent so jobs_sync_and_notify.py runs every 15
+# minutes while your Mac is awake, without you running it by hand
+python scripts/install_launch_agent.py
+```
+
+Uninstalling the LaunchAgent: `python scripts/uninstall_launch_agent.py`. Restoring a backup:
+`SWETRACK_DATABASE_URL="sqlite:///path/to/new.db" python scripts/import_data.py --in <backup.json>`
+(restores onto a fresh database — see the script's own docstring for why it doesn't merge with
+an already-populated one).
 
 ## Cost stance
 
@@ -847,6 +932,6 @@ Recorded here rather than half-built:
   carry a real weighting signal.
 - Drift and service monitoring.
 - Cloud deployment, only if a genuinely free and safe option is deliberately selected.
-- Job Radar Checkpoint 6 (guarded subscription AI workbench), Checkpoint 7 (optional
-  privacy-safe GitHub Actions discovery), and Checkpoint 8 (outcome analytics and hardening) —
-  see `SWETrack_Job_Radar_Claude_Code_Handoff.md`.
+- Job Radar's own plan (`SWETrack_Job_Radar_Claude_Code_Handoff.md`) is now fully implemented
+  through Checkpoint 8 (outcome analytics and hardening). Further Job Radar work needs fresh
+  direction, not a defined next checkpoint.

@@ -15,8 +15,8 @@ from __future__ import annotations
 import argparse
 
 from swetrack.domains.jobs.notifications import DEFAULT_PRIORITY_THRESHOLD, QuietHours, notify_new_discoveries
-from swetrack.domains.jobs.registry import DEFAULT_SOURCES_PATH, build_adapter, load_source_registry
-from swetrack.domains.jobs.services import sync_source
+from swetrack.domains.jobs.orchestration import sync_registry_sources
+from swetrack.domains.jobs.registry import DEFAULT_SOURCES_PATH, load_source_registry
 from swetrack.domains.opportunities.ranking.tfidf import TfidfRanker
 from swetrack.infrastructure.database.base import get_engine, get_sessionmaker, init_db
 
@@ -34,13 +34,13 @@ def main() -> None:
     session = get_sessionmaker(engine)()
     try:
         entries = load_source_registry(args.registry)
-        for entry in entries:
-            if not entry.enabled:
+        for outcome in sync_registry_sources(session, entries):
+            if outcome.error is not None:
+                print(f"{outcome.entry.company}: FAILED -- {outcome.error}")
                 continue
-            jobs = build_adapter(entry).fetch()
-            result = sync_source(session, source_type=entry.adapter, jobs=jobs)
+            result = outcome.result
             print(
-                f"{entry.company}: fetched={result.total_fetched} new={result.new_count} "
+                f"{outcome.entry.company}: fetched={result.total_fetched} new={result.new_count} "
                 f"updated={result.updated_count} duplicate={result.duplicate_count}"
             )
 

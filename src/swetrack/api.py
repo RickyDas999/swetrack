@@ -17,12 +17,14 @@ is needed.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from swetrack import __version__
+from swetrack.domains.applications.analytics import AnalyticsReport, compute_analytics_report
 from swetrack.domains.applications.priority import (
     ApplicationPriority,
     compute_application_priority,
@@ -48,6 +50,7 @@ from swetrack.domains.interviews.services import create_interview, get_interview
 from swetrack.domains.jobs.eligibility import EligibilityStatus as EligibilityStatusType
 from swetrack.domains.jobs.inbox import InboxEntry, list_inbox
 from swetrack.domains.jobs.services import list_discovered_job_records
+from swetrack.domains.jobs.source_health import SourceHealth, list_source_health
 from swetrack.domains.learning.schemas import InterviewReadinessSummary, SkillMasterySummary, StudyRecommendation
 from swetrack.domains.learning.services import (
     get_interview_readiness_summary,
@@ -410,3 +413,28 @@ def get_recommendations(
     skill any tracked activity touches.
     """
     return get_study_recommendations(session, top_k=top_k)
+
+
+@app.get("/analytics/funnel", response_model=AnalyticsReport)
+def get_analytics_funnel(session: Session = Depends(get_db_session)) -> AnalyticsReport:
+    """Outcome analytics over your tracked application history: funnel, time-to-apply,
+    source yield, and response rate (Job Radar Checkpoint 8).
+
+    Named after the handoff's `/analytics/funnel` route, but returns the
+    full outcome-analytics report -- a separate route per metric would be
+    overkill for a single-user local app. Every number here is a
+    descriptive count/median/rate over your own history, never a model and
+    never a causal claim; see the response's own `caveat` field.
+    """
+    return compute_analytics_report(session, now=datetime.now(timezone.utc))
+
+
+@app.get("/jobs/sources/health", response_model=list[SourceHealth])
+def get_job_sources_health(session: Session = Depends(get_db_session)) -> list[SourceHealth]:
+    """Per-source sync reliability: last polled/success time, last error, failure streak.
+
+    Populated by scripts/jobs_fetch.py (registry mode) and
+    scripts/jobs_sync_and_notify.py via domains.jobs.orchestration -- empty
+    until you've run a registry sync at least once.
+    """
+    return list_source_health(session)

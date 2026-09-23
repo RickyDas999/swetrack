@@ -20,7 +20,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, String, Text
+from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from swetrack.infrastructure.database.base import Base
@@ -67,3 +67,24 @@ class DiscoveredJobRecord(Base):
     # (Job Radar Checkpoint 4) -- the dedup key that keeps a re-sync or a
     # re-run of the notification check from alerting twice for one job.
     notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+
+
+class JobSourceHealthRecord(Base):
+    """Per-source sync reliability (Job Radar Checkpoint 8: "source health dashboard").
+
+    Explicitly deferred in Checkpoint 2's docs/job-radar-integration-plan.md
+    ("no job_sources sync-metadata table... add when it has a real
+    consumer") -- domains/jobs/orchestration.py is that consumer.
+    """
+
+    __tablename__ = "job_source_health"
+
+    source_key: Mapped[str] = mapped_column(String, primary_key=True)
+    company_name: Mapped[str] = mapped_column(String)
+    adapter_type: Mapped[str] = mapped_column(String)
+    last_polled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    consecutive_failures: Mapped[int] = mapped_column(Integer, default=0)
+    total_success_count: Mapped[int] = mapped_column(Integer, default=0)
+    total_failure_count: Mapped[int] = mapped_column(Integer, default=0)
